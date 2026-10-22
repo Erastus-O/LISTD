@@ -249,4 +249,5 @@ function pwLive(el) {
 }
 
 /* open the invitation screen when the app is opened from an invitation link (#invite=CODE or ?invite=CODE) */
-function inviteFromUrl() { try { var m = String(location.hash + '&' + location.search).match(/invite=([A-Za-z0-9-]{8,9})/); if (m && (!window.LISTD_PORTAL || window.LISTD_PORTAL === 'pro')) { S.role = 'pro'; S.auth = { mode: 'invite', code: normCode(m[1]) }; } } catch (e) {} }
+/* Deep links from the website: #invite=CODE, #signup (Create account / Apply as a Pro) and #signin. */
+function inviteFromUrl() { try { var u = String(location.hash + '&' + location.search), m = u.match(/invite=([A-Za-z0-9-]{8,9})/), e = u.match(/[#&?](signup|signin)\b/); if (m && (!window.LISTD_PORTAL || window.LISTD_PORTAL === 'pro')) { S.role = 'pro'; S.auth = { mode: 'invite', code: normCode(m[1]) }; } else if (e && window.LISTD_PORTAL !== 'admin') { if (window.LISTD_PORTAL) S.role = window.LISTD_PORTAL; S.auth = { mode: e[1] }; } } catch (e) {} }

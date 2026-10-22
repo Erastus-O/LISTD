@@ -26,7 +26,8 @@ listd-code/
 ├── design-system/               Tokens (JSON + CSS), component CSS, design-system notes
 ├── docs/ARCHITECTURE.md         Developer guide
 ├── DECISIONS.md                 Product and implementation decisions
-├── Makefile                     build, serve, test
+├── build.py                     Builds public/: the website with the products alongside it
+├── Makefile                     build, site, serve, test
 └── requirements-dev.txt         Test dependencies
 ```
 
@@ -36,10 +37,33 @@ You need Python 3.10 or later. Nothing else is needed to build and run.
 
 ```
 make build        # rebuild platform/dist and website/dist
-make serve        # http://localhost:8000/website/ and http://localhost:8000/platform/dist/listd-platform.html
+make site         # build public/: the website at /, the products at /app/
+make serve        # http://localhost:8000/ (website) and http://localhost:8000/app/client.html
 ```
 
-You can also open the files directly. `website/index.html` and `platform/dist/*.html` work from disk.
+You can also open the files directly. `public/index.html`, `website/index.html` and `platform/dist/*.html` work from disk.
+
+## Website and app together
+
+`python3 build.py` (or `make site`) puts both in `public/`, ready to host as one static site:
+
+| Path | What |
+|---|---|
+| `/` | Website (`index.html`, `css/`, `js/`, `images/`) |
+| `/app/client.html` | Client app |
+| `/app/pro.html` | Pro app |
+| `/app/admin.html` | Admin panel |
+| `/app/` | Redirects to the Client app |
+
+The website's buttons open the app on the right screen, and the listd logo in the app goes back to the website:
+
+| Website button | Opens |
+|---|---|
+| Get started, Book a service, Create client account, pricing "Get started" | `app/client.html#signup` (Create your account) |
+| Log in, Review report | `app/client.html#signin` |
+| Become a Pro, Apply to join | `app/pro.html#signup` (Apply to join LISTD) |
+
+`#signup` and `#signin` work on any Client or Pro build, next to the existing `#invite=CODE`.
 
 Opened outside claude.ai, the products run in **local demo mode**:
 
@@ -51,13 +75,13 @@ Payments, refunds and payouts are simulated in every mode.
 
 ## Website
 
-The website is plain HTML, CSS and JavaScript. Host the `website/` folder on any static host (Netlify, Vercel, S3, GitHub Pages) as it is. Fonts load from Google Fonts. `build.py` inlines everything into `dist/listd-website.html` for single-file hosting or previews.
+The website is plain HTML, CSS and JavaScript. Host `public/` (website and app) or the `website/` folder alone on any static host (Netlify, Vercel, S3, GitHub Pages) as it is. Fonts load from Google Fonts. `build.py` inlines everything into `dist/listd-website.html` for single-file hosting or previews.
 
 Links that leave the site:
 
 | Link | Goes to |
 |---|---|
-| Log in and Get started | `https://www.listd.co.uk/auth` |
+| Log in, Get started, Become a Pro | the app in `app/` (see above) |
 | Booking calls | Microsoft Bookings |
 | WhatsApp | `+44 7413 065681` |
 | Legal pages | `/privacy`, `/terms`, `/cookies` |
@@ -100,6 +124,7 @@ make test
 | Test | Covers |
 |---|---|
 | `check_portals.py` | Each single-product build opens on its own sign-in screen |
+| `e2e_site_links.py` | Website buttons open the right app screen, and the app logo returns to the website (uses `public/`) |
 | `e2e_auth.py` | Sign-up, sign-in, lockout, reset, sign-out, Admin two-step, claiming older profiles |
 | `e2e_settings.py` | Account, billing, email change, 2FA on and off, notifications, theme, data export, account closure |
 | `e2e_cross_portal.py` | Pro sign-in with an existing client login, and "Set up sign-in" |

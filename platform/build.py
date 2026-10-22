@@ -18,10 +18,12 @@ SRC = ['core.js', 'auth.js', 'actions.js', 'client.js', 'job.js', 'pro.js', 'set
 CSS = ['tokens.css', 'components.css', 'app.css']
 TITLES = {None: 'listd Platform', 'client': 'listd for Clients', 'pro': 'listd for Pros', 'admin': 'listd Admin'}
 
-def page(portal):
+def page(portal, site=None):
+    """site: URL of the marketing website; when set, the app's logo links back to it."""
     css = '\n'.join(read('styles', f) for f in CSS)
     js = '\n'.join(read('src', f) for f in SRC)
     flag = '' if portal is None else '<script>window.LISTD_PORTAL = %r;</script>\n' % portal
+    if site: flag += '<script>window.LISTD_SITE = %r;</script>\n' % site
     return ('<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
             '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n'
             '<title>%s</title>\n<meta name="description" content="LISTD property services platform">\n'
