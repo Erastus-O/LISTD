@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="LISTD: check-in and check-out inspections, repairs and cleaning for UK rental property, with timestamped photo reports.">
+<title>LISTD — property inspections, repairs and cleaning</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Raleway:ital,wght@0,500;0,600;0,700;1,500&family=Rammetto+One&display=swap">
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><symbol id="i-inventory" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2.5"/><path d="M9 3.5h6v2.5H9z"/><path d="M9 11h6M9 15h6M9 18.5h3"/></symbol><symbol id="i-check-in" viewBox="0 0 24 24"><path d="M14 4h4a1.5 1.5 0 0 1 1.5 1.5v13A1.5 1.5 0 0 1 18 20h-4"/><path d="M3.5 12h10M10 8l4 4-4 4"/></symbol><symbol id="i-check-out" viewBox="0 0 24 24"><path d="M10 4H6a1.5 1.5 0 0 0-1.5 1.5v13A1.5 1.5 0 0 0 6 20h4"/><path d="M9.5 12h11M17 8l4 4-4 4"/></symbol><symbol id="i-inspection" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M9 15l2 2 4-4"/></symbol><symbol id="i-cleaning" viewBox="0 0 24 24"><path d="M11 3l1.9 5.1L18 10l-5.1 1.9L11 17l-1.9-5.1L4 10l5.1-1.9z"/><path d="M18.5 15l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></symbol><symbol id="i-escrow" viewBox="0 0 24 24"><path d="M12 3l7.5 3v5.5c0 4.6-3.2 8-7.5 9.8-4.3-1.8-7.5-5.2-7.5-9.8V6z"/><path d="M9 12l2 2 4-4"/></symbol><symbol id="i-verified-pro" viewBox="0 0 24 24"><circle cx="10" cy="8" r="3.6"/><path d="M3.5 20c.8-3.9 3.6-6 6.5-6 1.9 0 3.5.7 4.7 2"/><path d="M15 18.5l2 2 4-4"/></symbol><symbol id="i-location" viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></symbol><symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8.5A1.5 1.5 0 0 1 5.5 7H8l1.5-2h5L16 7h2.5A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5z"/><circle cx="12" cy="13" r="3.3"/></symbol><symbol id="i-signature" viewBox="0 0 24 24"><path d="M4 18c2.5-.2 3.5-4.5 5-8.5.9-2.4 2.4-2.4 2.6-.6.3 2.5-1.6 7.1.4 7.1 1.4 0 2.1-3 3.4-3 1.2 0 .9 2.7 2.3 2.7.9 0 1.6-.6 2.3-1.2"/><path d="M4 21h16"/></symbol><symbol id="i-home" viewBox="0 0 24 24"><path d="M4 10.5L12 4l8 6.5V19a1.5 1.5 0 0 1-1.5 1.5H15V14H9v6.5H5.5A1.5 1.5 0 0 1 4 19z"/></symbol><symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2.5 2.5M14 9l2 2"/></symbol><symbol id="i-meter" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 13l4-4M8 17h8"/></symbol><symbol id="i-pound" viewBox="0 0 24 24"><path d="M16.5 6.5A3.8 3.8 0 0 0 9.5 8.5V13c0 2.5-1 4.5-3 6.5h11"/><path d="M6.5 13h8"/></symbol><symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></symbol><symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol><symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v9a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 4v-4A1.5 1.5 0 0 1 4 14.5z"/><path d="M8 9h8M8 12h5"/></symbol><symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></symbol><symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.8"/><path d="M4.5 20.5c.9-4 3.9-6.3 7.5-6.3s6.6 2.3 7.5 6.3"/></symbol><symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 19.5c.6-3.3 3-5.3 6-5.3s5.4 2 6 5.3"/><path d="M15.5 5.6a3 3 0 0 1 0 5.8M17.5 14.5c1.8.6 3 2.4 3.4 5"/></symbol><symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/></symbol><symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></symbol><symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></symbol><symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol><symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol><symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol><symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol><symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol><symbol id="i-chevron-up" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></symbol><symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></symbol><symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol><symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M4.5 12h15M14 6.5l5.5 5.5-5.5 5.5"/></symbol><symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="M19.5 12h-15M10 6.5L4.5 12l5.5 5.5"/></symbol><symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4.5h5.5V10M19.5 4.5L11 13"/><path d="M17 14v4.5A1.5 1.5 0 0 1 15.5 20h-10A1.5 1.5 0 0 1 4 18.5v-10A1.5 1.5 0 0 1 5.5 7H10"/></symbol><symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15.5V4.5M7.5 9L12 4.5 16.5 9"/><path d="M4.5 15v3.5A1.5 1.5 0 0 0 6 20h12a1.5 1.5 0 0 0 1.5-1.5V15"/></symbol><symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4.5v11M7.5 11l4.5 4.5 4.5-4.5"/><path d="M4.5 15v3.5A1.5 1.5 0 0 0 6 20h12a1.5 1.5 0 0 0 1.5-1.5V15"/></symbol><symbol id="i-image" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="9.5" r="1.8"/><path d="M20.5 15.5l-5-5-9 9"/></symbol><symbol id="i-file" viewBox="0 0 24 24"><path d="M6.5 3.5h7l4.5 4.5v11a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 5 19V5a1.5 1.5 0 0 1 1.5-1.5z"/><path d="M13.5 3.5V8H18M8.5 13h7M8.5 16.5h5"/></symbol><symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.4"/></symbol><symbol id="i-warning" viewBox="0 0 24 24"><path d="M12 4l9 15.5H3z"/><path d="M12 10v4.5M12 17.3v.4"/></symbol><symbol id="i-error" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9 9l6 6M15 9l-6 6"/></symbol><symbol id="i-success" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 12.3l2.4 2.4 4.6-4.9"/></symbol><symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol><symbol id="i-more" viewBox="0 0 24 24"><path d="M5.5 12h.01M12 12h.01M18.5 12h.01" stroke-width="3"/></symbol><symbol id="i-star" viewBox="0 0 24 24"><path d="M12 4l2.4 5 5.4.7-4 3.8 1 5.4L12 16.3 7.2 18.9l1-5.4-4-3.8 5.4-.7z"/></symbol><symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></symbol><symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></symbol><symbol id="i-activity" viewBox="0 0 24 24"><path d="M4 12h3.5l2.5-6 4 12 2.5-6H20"/></symbol><symbol id="i-flag" viewBox="0 0 24 24"><path d="M5.5 21V4M5.5 4.5h11l-2.5 4 2.5 4h-11"/></symbol><symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13"/></symbol><symbol id="i-edit" viewBox="0 0 24 24"><path d="M15.5 4.5l4 4L9 19H5v-4z"/><path d="M13 7l4 4"/></symbol></defs></svg>
+<div class="s-ann"><div class="s-wrap"><div class="s-in"><span><b>New:</b> Cleaning is now on LISTD. Light, General and Deep cleans, priced by property size.</span><button type="button" data-go="pros" data-scroll="cleaners">See cleaning</button></div></div></div>
+
+<header class="s-hdr" id="top">
+  <div class="s-wrap"><div class="s-in">
+    <a class="s-brand" href="#home" data-go="home" aria-label="listd home"><span class="ld-logo">listd</span></a>
+    <nav class="s-menu" aria-label="Main">
+      <div class="s-mi">
+        <button class="s-mbtn" type="button" aria-expanded="false" aria-controls="m-services">Services <svg class="ld-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chevron-down"/></svg></button>
+        <div class="s-pop" id="m-services" hidden>
+          <div>
+            <h6>Property services</h6>
+            <a href="#home" data-go="home" data-scroll="services"><span class="tile" style="--c:var(--service-inventory)"><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-inventory"/></svg></span><span><b>Inventory &amp; Condition</b><span class="d">Full schedule of condition at the start</span></span></a>
+            <a href="#home" data-go="home" data-scroll="services"><span class="tile" style="--c:var(--service-checkin)"><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check-in"/></svg></span><span><b>Check-In</b><span class="d">Digital sign-off as the tenant moves in</span></span></a>
+            <a href="#home" data-go="home" data-scroll="services"><span class="tile" style="--c:var(--service-checkout)"><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check-out"/></svg></span><span><b>Check-Out</b><span class="d">Fair deposit decisions at the end</span></span></a>
+            <a href="#home" data-go="home" data-scroll="services"><span class="tile" style="--c:var(--service-midterm)"><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-inspection"/></svg></span><span><b>Mid-Term Inspections</b><span class="d">Catch issues early, on record</span></span></a>
+            <a href="#pros" data-go="pros" data-scroll="cleaners"><span class="tile" style="--c:var(--service-cleaning)"><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cleaning"/></svg></span><span><b>Cleaning<span class="ld-badge ld-badge-brand" style="height:20px;font-size:11px">New</span></b><span class="d">Light, General and Deep cleans</span></span></a>
+          </div>
+          <div class="side">
+            <h6>Platform</h6>
+            <a href="#how-it-works" data-go="how-it-works"><span><b>How it works</b><span class="d">From booking to signed-off report</span></span></a>
+            <a href="#pricing" data-go="pricing"><span><b>Service tiers</b><span class="d">Flex, Core and Priority</span></span></a>
+            <a href="#about" data-go="about" data-scroll="trust"><span><b>Trust &amp; safety</b><span class="d">Vetting, escrow and disputes</span></span></a>
+          </div>
+        </div>
+      </div>
+      <div class="s-mi">
+        <button class="s-mbtn" type="button" aria-expanded="false" aria-controls="m-sol">Solutions <svg class="ld-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chevron-down"/></svg></button>
+        <div class="s-pop narrow" id="m-sol" hidden>
+          <div>
+            <h6>Who it's for</h6>
+            <a href="#home" data-go="home" data-scroll="clients"><span class="tile plain"><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-home"/></svg></span><span><b>Letting agents</b><span class="d">Every job tracked, every report consistent</span></span></a>
+            <a href="#home" data-go="home" data-scroll="clients"><span class="tile plain"><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-key"/></svg></span><span><b>Landlords</b><span class="d">Professional evidence, pay per service</span></span></a>
+            <a href="#home" data-go="home" data-scroll="clients"><span class="tile plain"><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-users"/></svg></span><span><b>Property managers</b><span class="d">One standard across your portfolio</span></span></a>
+            <a href="#pros" data-go="pros"><span class="tile plain"><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-verified-pro"/></svg></span><span><b>Inventory clerks</b><span class="d">Join the LISTD Pro network</span></span></a>
+            <a href="#pros" data-go="pros" data-scroll="cleaners"><span class="tile plain"><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cleaning"/></svg></span><span><b>Cleaners</b><span class="d">Cleaning jobs that come to you</span></span></a>
+          </div>
+        </div>
+      </div>
+      <a class="s-mbtn" href="#pricing" data-go="pricing" data-nav="pricing">Pricing</a>
+      <a class="s-mbtn" href="#pros" data-go="pros" data-nav="pros">For Pros</a>
+      <div class="s-mi">
+        <button class="s-mbtn" type="button" aria-expanded="false" aria-controls="m-co">Company <svg class="ld-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chevron-down"/></svg></button>
+        <div class="s-pop narrow" id="m-co" hidden>
+          <div>
+            <a href="#about" data-go="about"><span class="tile plain"><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-flag"/></svg></span><span><b>About LISTD</b><span class="d">Our mission and values</span></span></a>
+            <a href="#about" data-go="about" data-scroll="careers"><span class="tile plain"><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-users"/></svg></span><span><b>Careers</b><span class="d">See open roles</span></span></a>
+            <a href="#contact" data-go="contact"><span class="tile plain"><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chat"/></svg></span><span><b>Contact</b><span class="d">Talk to the team or book a demo</span></span></a>
+          </div>
+        </div>
+      </div>
+    </nav>
+    <div class="s-hdr-act">
+      <a class="ld-btn ld-btn-ghost s-hide-sm" href="#contact" data-go="contact">Talk to us</a>
+      <a class="ld-btn ld-btn-secondary s-hide-sm" href="https://www.listd.co.uk/auth" target="_blank" rel="noopener">Log in</a>
+      <a class="ld-btn ld-btn-primary" href="https://www.listd.co.uk/auth" target="_blank" rel="noopener">Get started</a>
+      <button class="ld-iconbtn s-burger" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="drawer" id="burger"><svg class="ld-icon" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-menu"/></svg></button>
+    </div>
+  </div></div>
+  <div class="s-drawer" id="drawer" hidden>
+    <div class="s-wrap"><div class="s-in">
+      <h6>Services</h6>
+      <a href="#home" data-go="home" data-scroll="services"><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-inventory"/></svg> Inventories, check-ins &amp; check-outs</a>
+      <a href="#home" data-go="home" data-scroll="services"><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-inspection"/></svg> Mid-term inspections</a>
+      <a href="#pros" data-go="pros" data-scroll="cleaners"><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cleaning"/></svg> Cleaning</a>
+      <h6>Platform</h6>
+      <a href="#how-it-works" data-go="how-it-works"><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-activity"/></svg> How it works</a>
+      <a href="#pricing" data-go="pricing"><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-pound"/></svg> Pricing</a>
+      <a href="#pros" data-go="pros"><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-verified-pro"/></svg> For Pros &amp; cleaners</a>
+      <a href="#about" data-go="about"><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-flag"/></svg> About</a>
+      <a href="#contact" data-go="contact"><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chat"/></svg> Contact</a>
+      <a href="https://www.listd.co.uk/auth" target="_blank" rel="noopener"><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-user"/></svg> Log in</a>
+    </div></div>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ================= HOME ================= -->
+<div data-view="home">
+  <section class="s-hero s-wrap">
+    <div class="s-in">
+      <span class="ld-badge ld-badge-brand"><svg class="ld-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-location"/></svg> Bristol, Bath, Swindon &amp; surrounding areas</span>
+      <h1 class="s-h1">Property services, <em>on record.</em></h1>
+      <p class="s-lead">Book inventories, inspections and cleaning with verified Pros. Track every job in real time and receive evidence-backed reports, with payment held in escrow until you sign off.</p>
+      <div class="s-actions" style="justify-content:center">
+        <a class="ld-btn ld-btn-primary ld-btn-lg" href="https://www.listd.co.uk/auth" target="_blank" rel="noopener">Book a service <svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-arrow-right"/></svg></a>
+        <a class="ld-btn ld-btn-secondary ld-btn-lg" href="#pros" data-go="pros">Become a Pro</a>
+      </div>
+      <div class="s-trust"><span><svg class="ld-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check"/></svg> No subscription</span><span><svg class="ld-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check"/></svg> Pay per service</span><span><svg class="ld-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check"/></svg> Book in under two minutes</span></div>
+
+      <div class="s-panel">
+        <div class="s-svctabs" role="tablist" aria-label="Choose a service to preview">
+          <button class="s-tabbtn" role="tab" type="button" data-svc="inventory" aria-selected="false" style="--c:var(--service-inventory)"><i><svg class="ld-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-inventory"/></svg></i>Inventory</button>
+          <button class="s-tabbtn" role="tab" type="button" data-svc="check-in" aria-selected="false" style="--c:var(--service-checkin)"><i><svg class="ld-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check-in"/></svg></i>Check-In</button>
+          <button class="s-tabbtn" role="tab" type="button" data-svc="check-out" aria-selected="true" style="--c:var(--service-checkout)"><i><svg class="ld-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check-out"/></svg></i>Check-Out</button>
+          <button class="s-tabbtn" role="tab" type="button" data-svc="mid-term" aria-selected="false" style="--c:var(--service-midterm)"><i><svg class="ld-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-inspection"/></svg></i>Mid-Term</button>
+          <button class="s-tabbtn" role="tab" type="button" data-svc="cleaning" aria-selected="false" style="--c:var(--service-cleaning)"><i><svg class="ld-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cleaning"/></svg></i>Cleaning</button>
+        </div>
+        <div class="s-panel-card" id="heroCard" role="tabpanel" aria-live="polite"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="s-backed s-wrap" aria-label="Backed by">
+    <div class="s-in"><span class="lab">Backed by</span><span class="s-logo"><img src="images/logo-natwest-accelerator.png" width="676" height="72" alt="NatWest Accelerator"></span><span class="s-logo"><img src="images/logo-techspark.png" width="536" height="112" alt="techSPARK, all things tech in the west"></span></div>
+  </section>
+
+  <section class="s-sec s-wrap">
+    <div class="s-in">
+      <div class="s-head">
+        <span class="s-kicker">Book. Track. Deliver.</span>
+        <h2 class="s-h2">Every job, from booking to signed-off report</h2>
+        <p class="s-lead">LISTD runs the whole job in one place, so nobody chases a clerk, a photo or a payment again.</p>
+      </div>
+      <div class="s-life">
+        <div><span class="n">Stage 1</span><h3>Book</h3><p>Choose a property, a service and a tier. It takes under two minutes.</p>
+          <div class="s-mini"><div class="row"><b>Check-Out · Core</b><span>from £70</span></div><div class="row"><span>14 Clifton Road, BS8</span></div><div class="row"><span>Fri 24 Oct</span><b>10:00</b></div></div></div>
+        <div><span class="n">Stage 2</span><h3>Matched</h3><p>Verified Pros nearby are notified and accept the work. You get confirmation straight away.</p>
+          <div class="s-ping"><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-verified-pro"/></svg><span><b>Sam R.</b> accepted · Level 3 Pro</span></div><div class="s-ping"><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-bell"/></svg><span>Confirmation sent 09:40</span></div></div>
+        <div class="hot"><span class="n">Stage 3</span><h3>Track</h3><p>Follow progress live. Start photos, activity logs and evidence arrive as the Pro works.</p>
+          <div class="s-mini" style="background:var(--surface)"><ol class="ld-rail" style="--n:4" aria-label="Example job progress"><li class="done"><i></i></li><li class="done"><i></i></li><li class="current"><i></i></li><li class="todo"><i></i></li></ol><div class="row"><b>Kitchen · 9 of 14 items</b><span class="ld-pill" style="--c:var(--status-progress);height:24px;font-size:12px"><i></i>In progress</span></div></div></div>
+        <div><span class="n">Stage 4</span><h3>Deliver</h3><p>Review the report, comment and sign off digitally. Escrow releases payment automatically.</p>
+          <div class="s-mini"><div class="row"><b>Report ready</b><span class="ld-pill" style="--c:var(--status-signed);height:24px;font-size:12px"><i></i>Signed off</span></div><div class="row"><span>86 photos · 14 rooms</span><b>£70.00 released</b></div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="s-sec s-wrap" style="padding-top:0" id="clients">
+    <div class="s-in" style="display:grid;gap:var(--space-24)">
+      <div class="s-split">
+        <div>
+          <span class="s-kicker">Evidence-based delivery</span>
+          <h2 class="s-h2" style="margin-top:12px">Reports that hold up in a deposit dispute</h2>
+          <div class="s-acc" data-acc>
+            <div><button type="button" aria-expanded="true"><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-camera"/></svg> Timestamped photo evidence <svg class="ld-icon ch" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chevron-down"/></svg></button><div class="s-acc-body">Every photo carries its room, item and time, from start photos to completion. Nothing is added later without a record.</div></div>
+            <div><button type="button" aria-expanded="false"><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-inventory"/></svg> Structured condition ratings <svg class="ld-icon ch" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chevron-down"/></svg></button><div class="s-acc-body" hidden>Core and Priority reports rate every item: Excellent, Good, Fair or Poor, with finger-scale damage references and close-ups on Priority.</div></div>
+            <div><button type="button" aria-expanded="false"><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-signature"/></svg> Digital sign-off and audit trail <svg class="ld-icon ch" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chevron-down"/></svg></button><div class="s-acc-body" hidden>Clients and tenants sign off digitally. Every action is timestamped, so all tiers are tribunal-ready and legally defensible.</div></div>
+          </div>
+        </div>
+        <figure class="s-evimg"><img src="images/evidence-report.jpg" width="832" height="905" alt="Evidence log for a carpet stain: window view, general area, stain close-up and the stain measured and circled at 3cm"></figure>
+      </div>
+
+      <div class="s-split rev">
+        <div>
+          <span class="s-kicker">Secure workflow</span>
+          <h2 class="s-h2" style="margin-top:12px">Money held fairly until the work is done</h2>
+          <div class="s-acc" data-acc>
+            <div><button type="button" aria-expanded="true"><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-escrow"/></svg> Escrow from the moment a job is accepted <svg class="ld-icon ch" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chevron-down"/></svg></button><div class="s-acc-body">Client funds are held securely. Pros know payment is guaranteed; clients know it is only released on approved delivery.</div></div>
+            <div><button type="button" aria-expanded="false"><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check"/></svg> Released when you approve the report <svg class="ld-icon ch" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chevron-down"/></svg></button><div class="s-acc-body" hidden>Review, comment and sign off. Payment is released from escrow automatically, with a receipt on record.</div></div>
+            <div><button type="button" aria-expanded="false"><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-flag"/></svg> A structured, fair dispute process <svg class="ld-icon ch" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chevron-down"/></svg></button><div class="s-acc-body" hidden>Disputes have admin oversight. Every party is heard, evidence is reviewed and the resolution is documented.</div></div>
+          </div>
+        </div>
+        <div class="s-visual warm">
+          <div class="s-float">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><span class="ld-eyebrow">Escrow · LJ-2041</span><span class="ld-tier ld-tier-core">Core</span></div>
+            <div class="s-escrow">
+              <div class="step"><span class="dot" style="--c:var(--info-fill)"><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-pound"/></svg></span><div><b>Funds held</b><span>21 Oct, 09:40 · job accepted</span></div><span class="amt">£70.00</span></div>
+              <div class="step"><span class="dot" style="--c:var(--live)"><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-camera"/></svg></span><div><b>Work delivered</b><span>24 Oct, 12:18 · report submitted</span></div><span class="ld-badge ld-badge-warning">Review</span></div>
+              <div class="step"><span class="dot" style="--c:var(--success-fill)"><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check"/></svg></span><div><b>Released to Pro</b><span>On your sign-off</span></div><span class="amt">£70.00</span></div>
+            </div>
+            <span class="s-fine">Example job shown for illustration.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="s-split">
+        <div>
+          <span class="s-kicker">Verified professionals</span>
+          <h2 class="s-h2" style="margin-top:12px">Only vetted Pros reach your properties</h2>
+          <div class="s-acc" data-acc>
+            <div><button type="button" aria-expanded="true"><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-verified-pro"/></svg> ID, DBS and insurance checks <svg class="ld-icon ch" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chevron-down"/></svg></button><div class="s-acc-body">Every Pro passes identity verification, DBS checks and professional indemnity insurance requirements before accessing live jobs.</div></div>
+            <div><button type="button" aria-expanded="false"><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-star"/></svg> Performance-based levels <svg class="ld-icon ch" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chevron-down"/></svg></button><div class="s-acc-body" hidden>Pros start supervised at Level 1 and progress through five levels as they complete jobs and keep high ratings. Higher levels unlock independent and priority work.</div></div>
+            <div><button type="button" aria-expanded="false"><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-warning"/></svg> Strikes and accountability <svg class="ld-icon ch" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chevron-down"/></svg></button><div class="s-acc-body" hidden>Pros who fall below standards receive strikes with clear severity levels. Persistent issues lead to temporary or permanent suspension.</div></div>
+          </div>
+        </div>
+        <div class="s-visual sky">
+          <div class="s-float">
+            <div class="s-probadge"><span class="ld-avatar ld-avatar-lg"><span role="img" aria-label="Example Pro">SR</span><span class="v" title="Verified Pro"><svg class="ld-icon" width="10" height="10" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check"/></svg></span></span><div><b style="font-size:17px">Sam R.</b><div><span class="ld-level"><span aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></span>Level 3 · Standard</span></div></div></div>
+            <ul class="s-checks"><li><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-success"/></svg> Identity verified</li><li><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-success"/></svg> DBS check on file</li><li><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-success"/></svg> Professional indemnity insurance</li><li><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-success"/></svg> Independent work, all tiers</li></ul>
+            <span class="s-fine">Example Pro profile.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="s-sec s-wrap" id="services" style="background:var(--surface)">
+    <div class="s-in">
+      <div class="s-head left" style="max-width:none;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:end;gap:var(--space-4)">
+        <div style="display:grid;gap:12px"><span class="s-kicker">One platform, every service</span><h2 class="s-h2">Book it all in one place</h2></div>
+        <div class="s-actions"><a class="ld-btn ld-btn-primary" href="https://www.listd.co.uk/auth" target="_blank" rel="noopener">Book a service</a><a class="ld-btn ld-btn-secondary" href="#pricing" data-go="pricing">See pricing</a></div>
+      </div>
+      <div class="s-grid s-g3">
+        <div class="s-svcard" style="--c:var(--service-inventory)"><span class="ic"><svg class="ld-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-inventory"/></svg></span><h3>Inventory &amp; Condition</h3><p>A full schedule of condition with timestamped photo evidence at the start of a tenancy.</p></div>
+        <div class="s-svcard" style="--c:var(--service-checkin)"><span class="ic"><svg class="ld-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check-in"/></svg></span><h3>Check-In</h3><p>Document the property as the tenant moves in, with a digital sign-off both parties can trust.</p></div>
+        <div class="s-svcard" style="--c:var(--service-checkout)"><span class="ic"><svg class="ld-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check-out"/></svg></span><h3>Check-Out</h3><p>Compare against the inventory at the end of a tenancy to support fair deposit decisions.</p></div>
+        <div class="s-svcard" style="--c:var(--service-midterm)"><span class="ic"><svg class="ld-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-inspection"/></svg></span><h3>Mid-Term Inspections</h3><p>Periodic checks during the tenancy so issues are caught early, with a clear record.</p></div>
+        <div class="s-svcard" style="--c:var(--service-cleaning)"><span class="ic"><svg class="ld-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cleaning"/></svg></span><h3>Cleaning <span class="ld-badge ld-badge-brand" style="vertical-align:middle">New</span></h3><p>Light, General and Deep cleans between tenancies, priced by property size, carried out by vetted cleaners.</p></div>
+        <div class="s-svcard soon" style="--c:var(--border-strong)"><span class="ic" style="background:var(--surface);color:var(--text-muted)"><svg class="ld-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-plus"/></svg></span><h3>More property services</h3><p>Additional services are coming to the same account. Tell us what you need next.</p><a class="ld-link" href="#contact" data-go="contact">Suggest a service</a></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="s-sec s-wrap">
+    <div class="s-in">
+      <div class="s-head"><span class="s-kicker">Clear by design</span><h2 class="s-h2">The numbers that matter</h2></div>
+      <div class="s-facts">
+        <div class="s-fact"><span class="v num">£55</span><span class="k">Starting price for a Flex inspection on a studio. No subscription.</span></div>
+        <div class="s-fact"><span class="v">Same day</span><span class="k">Turnaround on Priority, for dispute-sensitive tenancies.</span></div>
+        <div class="s-fact"><span class="v num">24–48h</span><span class="k">To verify a new Pro before they can accept jobs.</span></div>
+        <div class="s-fact"><span class="v num">5</span><span class="k">Pro levels, unlocked by completed jobs and ratings.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="s-band s-wrap s-sec">
+    <div class="s-in s-split">
+      <div style="display:grid;gap:var(--space-5)">
+        <span class="s-kicker">For property professionals</span>
+        <h2 class="s-h2">Join the LISTD Pro network</h2>
+        <p class="s-lead">Receive opportunities in your area, build your reputation and get paid securely on every job. Flexible work with clear standards.</p>
+        <div class="s-actions"><a class="ld-btn ld-btn-accent ld-btn-lg" href="#pros" data-go="pros">Become a Pro <svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-arrow-right"/></svg></a><a class="ld-btn ld-btn-secondary ld-btn-lg" href="#pros" data-go="pros" data-scroll="cleaners">I'm a cleaner</a></div>
+      </div>
+      <figure class="s-proimg">
+        <img src="images/pros-cleaner.jpg" width="1100" height="734" alt="A smiling LISTD cleaning professional in a blue polo and gloves, kneeling with a spray bottle and cloth in a bright hallway">
+        <div class="s-pi-chip s-pi-tl"><span class="ld-badge ld-badge-success"><svg class="ld-icon" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check"/></svg> Verified Pro</span><span class="ld-level"><span aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></span>Level 3 · Standard</span></div>
+        <div class="s-pi-chip s-pi-br"><span class="ld-eyebrow">New job nearby</span><b>Deep clean · Redland, BS6</b><span class="s-fine">1.8 miles · paid via escrow</span></div>
+        <figcaption>Five levels, from Trainee to Expert.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="s-sec s-wrap" id="faq">
+    <div class="s-in">
+      <div class="s-head"><span class="s-kicker">Questions</span><h2 class="s-h2">Frequently asked questions</h2></div>
+      <div class="s-faq"><div class="s-acc" data-acc>
+        <div><button type="button" aria-expanded="true">Do I need a subscription? <svg class="ld-icon ch" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chevron-down"/></svg></button><div class="s-acc-body">No. LISTD is pay per service. Create a free client account, add your properties and pay for each job you book.</div></div>
+        <div><button type="button" aria-expanded="false">How are Pros vetted? <svg class="ld-icon ch" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chevron-down"/></svg></button><div class="s-acc-body" hidden>Every Pro passes identity verification, DBS checks and professional indemnity insurance requirements, then a probationary period before accessing live jobs. Verification takes 24–48 hours.</div></div>
+        <div><button type="button" aria-expanded="false">When is my payment released? <svg class="ld-icon ch" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chevron-down"/></svg></button><div class="s-acc-body" hidden>Funds are held in escrow from the moment a Pro accepts your job. They are only released when you approve the completed report.</div></div>
+        <div><button type="button" aria-expanded="false">Which tier should I choose? <svg class="ld-icon ch" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chevron-down"/></svg></button><div class="s-acc-body" hidden>Flex suits standard ASTs with a lower chance of dispute. Core is built for agencies managing mixed portfolios. Priority is for high-value properties, dispute-sensitive tenancies and corporate landlords. All tiers are tribunal-ready.</div></div>
+        <div><button type="button" aria-expanded="false">What if I disagree with a report? <svg class="ld-icon ch" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chevron-down"/></svg></button><div class="s-acc-body" hidden>Add comments before you sign off, or raise a dispute. Our structured process has admin oversight: evidence is reviewed and every resolution is documented.</div></div>
+        <div><button type="button" aria-expanded="false">Which areas do you cover? <svg class="ld-icon ch" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chevron-down"/></svg></button><div class="s-acc-body" hidden>Bristol, Bath, Swindon and surrounding areas today. We're expanding across the UK, so <a class="ld-link" href="#contact" data-go="contact">contact us about your area</a>.</div></div>
+      </div></div>
+    </div>
+  </section>
+</div>
+
+<!-- ================= HOW IT WORKS ================= -->
+<div data-view="how-it-works" hidden>
+  <section class="s-phead tint s-wrap"><div class="s-in"><span class="s-kicker">How it works</span><h1 class="s-h1" style="max-width:16ch">From booking to signed-off report</h1><p class="s-lead">Every step is structured, tracked and transparent, for clients and Pros alike.</p></div></section>
+  <section class="s-sec s-wrap" style="padding-top:var(--space-8)">
+    <div class="s-in">
+      <div class="s-steps">
+        <div class="s-step"><div class="card"><div><b>Clifton Lettings</b><span class="s-fine">3 properties added</span></div></div><b class="k"><span>01</span>Create your account</b><p>Clients add company details and properties. Pros complete verification and set their coverage areas.</p></div>
+        <div class="s-step"><div class="card"><div><span class="ld-tag" style="--t:var(--service-checkout-subtle);--tx:var(--service-checkout-text);height:24px">Check-Out</span><b>Core · from £70</b></div></div><b class="k"><span>02</span>Book a service</b><p>Select the property, choose a service and tier, and submit your requirements.</p></div>
+        <div class="s-step"><div class="card"><div><b>Sam R. accepted</b><span class="s-fine">Matched on location and availability</span></div></div><b class="k"><span>03</span>Pro assigned</b><p>Verified Pros are notified and accept. You get confirmation as soon as it's accepted.</p></div>
+        <div class="s-step"><div class="card"><div><b>Kitchen · 9 of 14 items</b><div class="ld-progress-bar"><i style="width:64%;background:var(--live)"></i></div></div></div><b class="k"><span>04</span>Service delivery</b><p>The Pro works through a structured workflow: start and completion photos, documentation and updates.</p></div>
+        <div class="s-step"><div class="card"><div><b>Report signed</b><span class="s-fine">£70.00 released from escrow</span></div></div><b class="k"><span>05</span>Track, review &amp; complete</b><p>Review the report, access the evidence, keep a clear audit trail. Escrow releases on confirmed delivery.</p></div>
+      </div>
+    </div>
+  </section>
+  <section class="s-sec s-wrap" style="background:var(--surface)">
+    <div class="s-in s-split">
+      <div style="display:grid;gap:var(--space-4)"><span class="s-kicker">Your workflow as a client</span><h2 class="s-h2">Five steps, no chasing</h2>
+        <ol class="s-checks" style="counter-reset:none;font-size:16px;gap:14px">
+          <li><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-home"/></svg> Add properties with room counts and furnishing details</li>
+          <li><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-file"/></svg> Choose a service and a service tier</li>
+          <li><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-verified-pro"/></svg> A verified Pro accepts and completes the work</li>
+          <li><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-signature"/></svg> Review the report, add comments and sign off digitally</li>
+          <li><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-escrow"/></svg> Payment is released from escrow automatically</li>
+        </ol>
+        <div class="s-actions" style="margin-top:8px"><a class="ld-btn ld-btn-primary ld-btn-lg" href="https://www.listd.co.uk/auth" target="_blank" rel="noopener">Create client account</a></div>
+      </div>
+      <div class="s-visual">
+        <article class="ld-card ld-job" style="--c:var(--service-inventory);--t:var(--service-inventory-subtle);--tx:var(--service-inventory-text)">
+          <div class="ld-job-top"><span class="ld-tag" style="--c:var(--service-inventory);--t:var(--service-inventory-subtle);--tx:var(--service-inventory-text)"><svg class="ld-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-inventory"/></svg>Inventory</span><span class="ld-pill" style="--c:var(--status-awaiting)"><i aria-hidden="true"></i>Awaiting sign-off</span></div>
+          <h3>Flat 3, 22 Pulteney St, Bath BA2</h3>
+          <div class="ld-job-meta"><span><svg class="ld-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-calendar"/></svg>21 Oct 2026</span><span class="ld-tier ld-tier-priority">Priority</span></div>
+          <div class="ld-card-foot"><span class="s-fine">Example job</span><a class="ld-btn ld-btn-primary ld-btn-sm" href="https://www.listd.co.uk/auth" target="_blank" rel="noopener">Review report</a></div>
+        </article>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ================= PRICING ================= -->
+<div data-view="pricing" hidden>
+  <section class="s-phead tint s-wrap"><div class="s-in"><span class="s-kicker">Service tiers</span><h1 class="s-h1" style="max-width:15ch">Pay for certainty, not rework</h1><p class="s-lead">Clear scope, no grey areas. Every tier scales by property size and furnishing. No subscription.</p></div></section>
+  <section class="s-wrap" style="padding-block:var(--space-6) var(--space-16)">
+    <div class="s-in">
+      <div class="s-tiers">
+        <div class="s-tier"><h3>Flex</h3><p class="rec">Standard ASTs with lower dispute probability.</p><div class="price"><small>from</small><b class="num">£55</b><small>/ inspection</small></div><a class="ld-btn ld-btn-secondary ld-btn-full" href="https://www.listd.co.uk/auth" target="_blank" rel="noopener">Get started</a>
+          <ul><li><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-clock"/></svg> 36–72 hour turnaround</li><li><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-file"/></svg> Essential written notes</li><li><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-camera"/></svg> Full room context photography</li><li><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-signature"/></svg> Standard 7-day sign-off window</li></ul></div>
+        <div class="s-tier pop"><span class="flag ld-badge ld-badge-solid">Most popular</span><h3>Core</h3><p class="rec">Professional agencies managing mixed portfolios.</p><div class="price"><small>from</small><b class="num">£70</b><small>/ inspection</small></div><a class="ld-btn ld-btn-primary ld-btn-full" href="https://www.listd.co.uk/auth" target="_blank" rel="noopener">Get started</a>
+          <ul><li><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-clock"/></svg> 24–36 hour turnaround</li><li><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-inventory"/></svg> Structured condition ratings per item</li><li><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-camera"/></svg> Context and damage-framing photography</li><li><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-bell"/></svg> Reminders within the 7-day sign window</li></ul></div>
+        <div class="s-tier"><h3>Priority</h3><p class="rec">High-value properties, dispute-sensitive tenancies, corporate landlords.</p><div class="price"><small>from</small><b class="num">£100</b><small>/ inspection</small></div><a class="ld-btn ld-btn-secondary ld-btn-full" href="https://www.listd.co.uk/auth" target="_blank" rel="noopener">Get started</a>
+          <ul><li><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-clock"/></svg> Same-day turnaround</li><li><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-file"/></svg> Detailed narrative alignment</li><li><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-search"/></svg> Macro close-up damage documentation</li><li><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-signature"/></svg> Accelerated sign-off, same day where possible</li></ul></div>
+      </div>
+      <p class="s-fine" style="text-align:center;margin-top:var(--space-6)">Studio starting prices shown. Every tier scales by property size, furnishing level and additional areas. All tiers are tribunal-ready, digitally signed, audit-trailed and legally defensible.</p>
+    </div>
+  </section>
+  <section class="s-sec s-wrap" style="background:var(--surface);padding-top:var(--space-16)">
+    <div class="s-in">
+      <div class="s-head"><h2 class="s-h2">Compare features</h2></div>
+      <div class="ld-tablewrap"><table class="ld-table s-cmp">
+        <caption class="ld-sr">Feature comparison of Flex, Core and Priority tiers</caption>
+        <thead><tr><th scope="col">Feature</th><th scope="col">Flex</th><th scope="col">Core</th><th scope="col">Priority</th></tr></thead>
+        <tbody>
+          <tr><td class="tc">Recommended for</td><td>Standard ASTs, lower dispute probability</td><td>Agencies managing mixed portfolios</td><td>High-value, dispute-sensitive, corporate</td></tr>
+          <tr class="grp"><td colspan="4">Evidence</td></tr>
+          <tr><td class="tc">Written condition detail</td><td>Essential written notes</td><td>Structured condition ratings per item</td><td>Detailed narrative alignment</td></tr>
+          <tr><td class="tc">Photo evidence density</td><td>Full room context</td><td>Context + damage framing</td><td>Context + macro-level detailing</td></tr>
+          <tr><td class="tc">Damage scale verification</td><td>Standard damage capture</td><td>Finger-scale damage reference</td><td>Finger-scale + macro close-ups</td></tr>
+          <tr><td class="tc">Exterior documentation</td><td>Overview</td><td>Landscape coverage</td><td>Multi-angle + close-up</td></tr>
+          <tr><td class="tc">Meter location documentation</td><td>Basic meter context</td><td>Structured meter location</td><td>Multi-angle + clear location</td></tr>
+          <tr class="grp"><td colspan="4">Delivery</td></tr>
+          <tr><td class="tc">Turnaround</td><td class="num">36–72 hours</td><td class="num">24–36 hours</td><td>Same day</td></tr>
+          <tr><td class="tc">Sign-off window</td><td>Standard 7 days</td><td>Reminders within 7 days</td><td>Accelerated, same day where tenant details provided</td></tr>
+          <tr><td class="tc">Tribunal-ready &amp; audit-trailed</td><td><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check"/></svg><span class="ld-sr">Yes</span></td><td><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check"/></svg><span class="ld-sr">Yes</span></td><td><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check"/></svg><span class="ld-sr">Yes</span></td></tr>
+          <tr><td class="tc">Escrow-protected payment</td><td><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check"/></svg><span class="ld-sr">Yes</span></td><td><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check"/></svg><span class="ld-sr">Yes</span></td><td><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check"/></svg><span class="ld-sr">Yes</span></td></tr>
+        </tbody>
+      </table></div>
+      <div class="ld-alert ld-alert-info" style="margin-top:var(--space-6)" role="status"><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-cleaning"/></svg><div><b>Cleaning is priced differently</b><p>Light, General and Deep cleans are priced by property size and clean level. You'll see the price before you book.</p></div><span></span></div>
+    </div>
+  </section>
+</div>
+
+<!-- ================= PROS ================= -->
+<div data-view="pros" hidden>
+  <section class="s-phead tint s-wrap" style="text-align:left"><div class="s-in s-split" style="justify-items:stretch">
+    <div style="display:grid;gap:var(--space-5)"><span class="s-kicker">For property professionals</span><h1 class="s-h1">Work that comes to you. Pay that's protected.</h1><p class="s-lead">Join the LISTD Pro network for inventories, inspections and cleaning. Build your reputation, progress through levels and get paid securely on every job.</p>
+      <div class="s-actions"><a class="ld-btn ld-btn-primary ld-btn-lg" href="https://www.listd.co.uk/auth" target="_blank" rel="noopener">Become a Pro</a><button class="ld-btn ld-btn-secondary ld-btn-lg" type="button" data-scroll="cleaners">I'm a cleaner</button></div>
+      <span class="s-fine">Verification takes 24–48 hours. Start accepting jobs as soon as you're approved.</span></div>
+    <div class="s-phone" aria-label="Example of the Pro app">
+      <div class="scr">
+        <div class="bar"><span class="ld-logo">listd</span><span class="ld-badge ld-badge-success"><svg class="ld-icon" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check"/></svg> Verified</span></div>
+        <div class="ld-card"><span class="ld-eyebrow">Today · 24 Oct</span><b>Check-out · 14 Clifton Rd</b><ol class="ld-rail" style="--n:4" aria-label="Example job progress"><li class="done"><i></i></li><li class="done"><i></i></li><li class="current"><i></i></li><li class="todo"><i></i></li></ol><span class="s-fine">Kitchen · 9 of 14 items</span><span class="ld-btn ld-btn-primary ld-btn-sm" style="justify-self:start"><svg class="ld-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-camera"/></svg> Add evidence</span></div>
+        <div class="ld-card"><div style="display:flex;justify-content:space-between;gap:8px"><b>New job nearby</b><span class="ld-tier ld-tier-flex">Flex</span></div><span class="s-fine">Inventory · Redland, BS6 · 1.8 miles</span><span class="ld-btn ld-btn-secondary ld-btn-sm" style="justify-self:start">View job</span></div>
+      </div>
+    </div>
+  </div></section>
+  <section class="s-sec s-wrap">
+    <div class="s-in">
+      <div class="s-head"><h2 class="s-h2">Everything you need to do great work</h2></div>
+      <div class="s-grid s-g3">
+        <div class="s-svcard" style="--c:var(--service-inventory)"><span class="ic"><svg class="ld-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-inventory"/></svg></span><h3>Structured workflows</h3><p>Guided, evidence-based workflows for inventories, inspections and cleaning, with built-in standards and condition ratings.</p></div>
+        <div class="s-svcard" style="--c:var(--live)"><span class="ic"><svg class="ld-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-star"/></svg></span><h3>Level progression</h3><p>Start at Level 1 and progress as you complete jobs and maintain high ratings.</p></div>
+        <div class="s-svcard" style="--c:var(--accent)"><span class="ic"><svg class="ld-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-escrow"/></svg></span><h3>Secure payments</h3><p>Funds are held in escrow from the moment a job is accepted. Get paid reliably on every job.</p></div>
+        <div class="s-svcard" style="--c:var(--service-checkin)"><span class="ic"><svg class="ld-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-users"/></svg></span><h3>Build your reputation</h3><p>Earn ratings and reviews from clients. Higher ratings unlock better-paying priority work.</p></div>
+        <div class="s-svcard" style="--c:var(--service-midterm)"><span class="ic"><svg class="ld-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-file"/></svg></span><h3>Professional standards</h3><p>Clear expectations before you start, so you know exactly what's required on every job.</p></div>
+        <div class="s-svcard" style="--c:var(--service-cleaning)"><span class="ic"><svg class="ld-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-camera"/></svg></span><h3>Mobile-first tools</h3><p>Complete jobs on any device with photo capture, digital signatures and offline-ready forms.</p></div>
+      </div>
+    </div>
+  </section>
+  <section class="s-band s-wrap s-sec">
+    <div class="s-in s-split">
+      <div style="display:grid;gap:var(--space-4)"><span class="s-kicker">Pro progression levels</span><h2 class="s-h2">Your performance sets your access</h2><p class="s-lead">Complete jobs and keep quality high to move up. Each level opens more tiers and more independence.</p></div>
+      <div class="s-levels">
+        <div class="s-lv"><span class="tag">L1</span><div><b>Trainee</b><span>Flex tier only, supervised jobs</span></div><span class="j">0–5 jobs</span></div>
+        <div class="s-lv"><span class="tag">L2</span><div><b>Junior</b><span>Flex and Core tiers</span></div><span class="j">6–20 jobs</span></div>
+        <div class="s-lv"><span class="tag">L3</span><div><b>Standard</b><span>All tiers, independent work</span></div><span class="j">21–50 jobs</span></div>
+        <div class="s-lv"><span class="tag">L4</span><div><b>Senior</b><span>Priority jobs, mentoring access</span></div><span class="j">51–100 jobs</span></div>
+        <div class="s-lv"><span class="tag">L5</span><div><b>Expert</b><span>All tiers, tribunal-grade reports</span></div><span class="j">100+ jobs</span></div>
+      </div>
+    </div>
+  </section>
+  <section class="s-sec s-wrap" id="cleaners">
+    <div class="s-in">
+      <div class="s-head"><span class="s-kicker" style="color:var(--service-cleaning-text)">For cleaning professionals</span><h2 class="s-h2">Cleaning jobs that come to you</h2><p class="s-lead">Set your coverage postcodes and only see cleans nearby. Every clean has a room-by-room checklist, so you always know what "done" looks like.</p></div>
+      <div class="s-cleans">
+        <div class="s-clean"><span class="k">Level 1</span><h3>Light Clean</h3><p>A quick refresh where the property has been left in reasonable order: surfaces, floors, bins and WCs brought up to standard.</p></div>
+        <div class="s-clean"><span class="k">Level 2</span><h3>General Clean</h3><p>A thorough clean throughout: kitchen units, oven, fridge, bathrooms, floors, windows and soft furnishings.</p></div>
+        <div class="s-clean"><span class="k">Level 3</span><h3>Deep Clean</h3><p>A full deep clean of every area: moving furniture, descaling, appliances inside and out, and detailed finishing.</p></div>
+      </div>
+      <div class="s-grid s-g4" style="margin-top:var(--space-8)">
+        <div class="s-ccard"><span class="ic"><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-location"/></svg></span><b>Work in your area</b><span class="s-muted">Choose your postcodes and accept the jobs that suit you.</span></div>
+        <div class="s-ccard"><span class="ic"><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-camera"/></svg></span><b>Proof of work</b><span class="s-muted">Before and after photos protect you and the client.</span></div>
+        <div class="s-ccard"><span class="ic"><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-pound"/></svg></span><b>Transparent pay</b><span class="s-muted">Set by property size and clean level, paid once complete.</span></div>
+        <div class="s-ccard"><span class="ic"><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-verified-pro"/></svg></span><b>Vetted &amp; trusted</b><span class="s-muted">ID, DBS and insurance checks make your professionalism stand out.</span></div>
+      </div>
+      <div class="s-actions" style="justify-content:center;margin-top:var(--space-10)"><a class="ld-btn ld-btn-primary ld-btn-lg" href="https://www.listd.co.uk/auth" target="_blank" rel="noopener">Apply to join</a></div>
+    </div>
+  </section>
+</div>
+
+<!-- ================= ABOUT ================= -->
+<div data-view="about" hidden>
+  <section class="s-phead tint s-wrap"><div class="s-in"><span class="s-kicker">About LISTD</span><h1 class="s-h1" style="max-width:16ch">Controlled infrastructure, not gig-economy chaos</h1><p class="s-lead">LISTD brings professional standards to UK property services. We connect letting agents and landlords with verified Pros for inventories, inspections and cleaning through a structured, tier-based system: consistent quality, fair pricing and secure payment.</p></div></section>
+  <section class="s-sec s-wrap" style="padding-top:var(--space-8)">
+    <div class="s-in">
+      <div class="s-head"><h2 class="s-h2">What we stand for</h2></div>
+      <div class="s-values">
+        <div class="s-value" style="--t:var(--service-inventory-subtle);--c:var(--accent)"><span class="ic"><svg class="ld-icon" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-verified-pro"/></svg></span><h3>Verified professionals</h3><p>Every Pro passes identity verification, qualification checks and a probationary period before accessing live jobs.</p></div>
+        <div class="s-value" style="--t:var(--warning-subtle);--c:var(--live)"><span class="ic"><svg class="ld-icon" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-escrow"/></svg></span><h3>Escrow-secured payments</h3><p>Client funds are held in escrow from job acceptance. Pros are guaranteed payment on approved delivery.</p></div>
+        <div class="s-value" style="--t:var(--service-midterm-subtle);--c:var(--service-midterm)"><span class="ic"><svg class="ld-icon" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-flag"/></svg></span><h3>Fair dispute resolution</h3><p>A structured process with admin oversight. Every party is heard, evidence is reviewed and resolutions are documented.</p></div>
+        <div class="s-value" style="--t:var(--service-checkin-subtle);--c:var(--service-checkin)"><span class="ic"><svg class="ld-icon" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-eye"/></svg></span><h3>Full transparency</h3><p>Every action is timestamped and tracked. Clients and Pros have complete visibility into job progress.</p></div>
+        <div class="s-value" style="--t:var(--service-checkout-subtle);--c:var(--service-checkout)"><span class="ic"><svg class="ld-icon" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-warning"/></svg></span><h3>Strikes &amp; accountability</h3><p>Pros who fall below standards receive strikes with clear severity levels. Persistent issues lead to suspension.</p></div>
+        <div class="s-value" style="--t:var(--service-cleaning-subtle);--c:var(--service-cleaning)"><span class="ic"><svg class="ld-icon" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-lock"/></svg></span><h3>Non-circumvention</h3><p>All parties agree to operate within the platform, protecting the network and fair pay for everyone.</p></div>
+      </div>
+    </div>
+  </section>
+  <section class="s-sec s-wrap" id="trust" style="background:var(--surface)">
+    <div class="s-in">
+      <div class="s-head"><span class="s-kicker">Trust &amp; safety</span><h2 class="s-h2">Every layer protects every party</h2></div>
+      <ul class="s-trustlist">
+        <li><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-user"/></svg> Identity verification for all users</li><li><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-file"/></svg> DBS check documentation for Pros</li><li><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-escrow"/></svg> Professional indemnity insurance requirements</li><li><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-star"/></svg> Performance-based level progression</li><li><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chat"/></svg> Client review and rating system</li><li><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-flag"/></svg> Admin-managed dispute resolution</li><li><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-pound"/></svg> Automated escrow payment protection</li><li><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-lock"/></svg> Non-circumvention agreements</li><li><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-activity"/></svg> Real-time job status tracking</li><li><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-clock"/></svg> Audit trail on every action</li>
+      </ul>
+    </div>
+  </section>
+  <section class="s-sec s-wrap" id="careers">
+    <div class="s-in s-split">
+      <div style="display:grid;gap:var(--space-4)"><span class="s-kicker">Careers</span><h2 class="s-h2">Help build the UK's most trusted property services platform</h2><p class="s-lead">We hire people who care about transparency, evidence and doing right by clients, Pros and tenants.</p></div>
+      <div class="ld-empty"><div class="ic"><svg class="ld-icon" width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-users"/></svg></div><h3>No open roles right now</h3><p>We post every vacancy here first. Check back soon, or follow LISTD on LinkedIn to hear about new roles.</p></div>
+    </div>
+  </section>
+</div>
+
+<!-- ================= CONTACT ================= -->
+<div data-view="contact" hidden>
+  <section class="s-phead tint s-wrap"><div class="s-in"><span class="s-kicker">Contact</span><h1 class="s-h1">How can we help?</h1><p class="s-lead">Questions, a demo, or ready to get started: we're here.</p></div></section>
+  <section class="s-wrap" style="padding-block:var(--space-6) var(--space-24)">
+    <div class="s-in s-split" style="align-items:start">
+      <div style="display:grid;gap:var(--space-4)">
+        <div class="s-grid s-g2">
+          <div class="s-ccard"><span class="ic"><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chat"/></svg></span><b>Email support</b><span class="v" id="em">support@listd.co.uk</span><span class="s-fine">Reply within 24–48 hours</span><button class="s-copy" type="button" data-copy="em">Copy email</button></div>
+          <div class="s-ccard"><span class="ic"><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-bell"/></svg></span><b>Phone &amp; WhatsApp</b><span class="v" id="ph">+44 7413 065681</span><span class="s-fine">Business hours, Mon–Fri</span><div style="display:flex;gap:16px;flex-wrap:wrap"><button class="s-copy" type="button" data-copy="ph">Copy number</button><a class="ld-link" href="https://wa.me/447413065681" target="_blank" rel="noopener">WhatsApp</a></div></div>
+          <div class="s-ccard"><span class="ic"><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-calendar"/></svg></span><b>Book a walkthrough</b><span class="s-muted">A free 15-minute platform demo. No commitment.</span><a class="ld-link" href="https://outlook.office365.com/book/listd" target="_blank" rel="noopener">Choose a time</a></div>
+          <div class="s-ccard"><span class="ic"><svg class="ld-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-location"/></svg></span><b>Service area</b><span class="s-muted">Bristol, Bath, Swindon and surrounding areas. Expanding across the UK.</span></div>
+        </div>
+      </div>
+      <form class="s-form" id="contactForm" novalidate>
+        <div><h2 style="font:400 28px/34px var(--font-display);letter-spacing:-0.02em">Send us a message</h2><p class="s-fine" style="margin-top:6px">We'll get back to you within 24–48 hours.</p></div>
+        <div class="two">
+          <div class="ld-field"><label class="ld-label" for="cf-name">Name</label><div class="ld-control"><input class="ld-input" id="cf-name" autocomplete="name" required></div></div>
+          <div class="ld-field"><label class="ld-label" for="cf-email">Work email</label><div class="ld-control"><input class="ld-input" id="cf-email" type="email" autocomplete="email" placeholder="name@agency.co.uk" required></div></div>
+        </div>
+        <div class="ld-field"><label class="ld-label" for="cf-co">Company or organisation <small>Optional</small></label><div class="ld-control"><input class="ld-input" id="cf-co" autocomplete="organization"></div></div>
+        <div class="ld-field"><label class="ld-label" for="cf-role">I am a</label><div class="ld-control"><select class="ld-select" id="cf-role"><option>Letting agent</option><option>Landlord</option><option>Property manager</option><option>Inventory clerk</option><option>Cleaner</option><option>Something else</option></select><svg class="ld-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chevron-down"/></svg></div></div>
+        <div class="ld-field"><label class="ld-label" for="cf-msg">Message</label><div class="ld-control ld-control-area"><textarea class="ld-input" id="cf-msg" rows="4" placeholder="Tell us about your properties or the area you cover" required></textarea></div></div>
+        <button class="ld-btn ld-btn-primary ld-btn-lg ld-btn-full" type="submit">Send message</button>
+        <p class="s-fine">By submitting this form you agree to our Privacy Policy.</p>
+        <div id="formNote" hidden></div>
+      </form>
+    </div>
+  </section>
+</div>
+
+<!-- ================= 404 ================= -->
+<div data-view="notfound" hidden>
+  <section class="s-404 s-wrap"><div class="s-in"><div class="box"><span class="code">404</span><h1 class="s-h2">Sorry, we can't find that page</h1><p class="s-lead">The page may have moved. Head back home or get in touch and we'll point you in the right direction.</p><div class="s-actions" style="justify-content:center"><a class="ld-btn ld-btn-primary" href="#home" data-go="home">Visit homepage</a><a class="ld-btn ld-btn-secondary" href="#contact" data-go="contact">Contact us</a></div></div></div></section>
+</div>
+
+<section class="s-wrap" style="padding-block:0 var(--space-16)" id="ctaWrap">
+  <div class="s-in s-cta">
+    <span class="s-kicker" style="color:var(--mint-300)">Get started</span>
+    <h2 class="s-h2">Make every handover provable</h2>
+    <p>Create a free client account and book your first property service in minutes. No subscription, pay per service.</p>
+    <div class="s-actions" style="justify-content:center"><a class="ld-btn ld-btn-accent ld-btn-lg" href="https://www.listd.co.uk/auth" target="_blank" rel="noopener">Book a service</a><a class="ld-btn ld-btn-secondary ld-btn-lg" href="#contact" data-go="contact">Talk to us</a></div>
+  </div>
+</section>
+</main>
+
+<footer class="s-foot s-wrap">
+  <div class="s-in">
+    <div class="top">
+      <div><span class="ld-logo ld-logo-white" style="font-size:38px">listd</span><p class="tag">Book. Track. Deliver.</p></div>
+      <div class="cols">
+        <div><h6>Services</h6><ul><li><a href="#home" data-go="home" data-scroll="services">Inventories</a></li><li><a href="#home" data-go="home" data-scroll="services">Check-ins &amp; check-outs</a></li><li><a href="#home" data-go="home" data-scroll="services">Mid-term inspections</a></li><li><a href="#pros" data-go="pros" data-scroll="cleaners">Cleaning</a></li></ul></div>
+        <div><h6>Platform</h6><ul><li><a href="#how-it-works" data-go="how-it-works">How it works</a></li><li><a href="#pricing" data-go="pricing">Service tiers</a></li><li><a href="#about" data-go="about" data-scroll="trust">Trust &amp; safety</a></li><li><a href="#home" data-go="home" data-scroll="faq">FAQ</a></li></ul></div>
+        <div><h6>For you</h6><ul><li><a href="#home" data-go="home" data-scroll="clients">For clients</a></li><li><a href="#pros" data-go="pros">For Pros</a></li><li><a href="#pros" data-go="pros" data-scroll="cleaners">For cleaners</a></li></ul></div>
+        <div><h6>Company</h6><ul><li><a href="#about" data-go="about">About</a></li><li><a href="#about" data-go="about" data-scroll="careers">Careers</a></li><li><a href="#contact" data-go="contact">Contact</a></li><li><a href="https://www.listd.co.uk/terms" target="_blank" rel="noopener">Terms</a> · <a href="https://www.listd.co.uk/privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://www.listd.co.uk/cookies" target="_blank" rel="noopener">Cookies</a></li></ul></div>
+      </div>
+    </div>
+    <div class="bot"><span>© 2026 LISTD · Bristol, Bath &amp; surrounding areas</span><span><span class="sel">support@listd.co.uk</span> · <span class="sel">+44 7413 065681</span></span></div>
+  </div>
+</footer>
+<div class="ld-toast" id="toast" role="status" aria-live="polite" hidden style="position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:var(--z-toast)"><span class="dot" style="--c:var(--success-fill)"><svg class="ld-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check"/></svg></span><div><b id="toastT">Copied</b></div><span></span></div>
+
+<script src="js/site.js"></script>
+<script src="js/motion.js"></script>
+
+
+
+</body>
+</html>
