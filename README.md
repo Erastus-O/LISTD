@@ -65,6 +65,19 @@ The website's buttons open the app on the right screen, and the listd logo in th
 
 `#signup` and `#signin` work on any Client or Pro build, next to the existing `#invite=CODE`.
 
+### GitHub Pages
+
+`.github/workflows/pages.yml` builds `public/`, runs the portal and site-link tests, and deploys to GitHub Pages on every push to `main` or `claude/cool-einstein-32rfsv` (or by hand from the Actions tab).
+
+- Website: https://erastus-o.github.io/LISTD/
+- Client app: https://erastus-o.github.io/LISTD/app/client.html
+- Pro app: https://erastus-o.github.io/LISTD/app/pro.html
+- Admin: https://erastus-o.github.io/LISTD/app/admin.html
+
+One-time setup, if the first run fails at "configure-pages": in the repo, go to Settings › Pages › Build and deployment, set Source to **GitHub Actions**, then re-run the workflow.
+
+On GitHub Pages the products run in local demo mode: data stays in each visitor's browser.
+
 Opened outside claude.ai, the products run in **local demo mode**:
 
 - data is saved in that browser only
