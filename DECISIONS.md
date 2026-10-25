@@ -193,3 +193,8 @@ Clients no longer choose Standard or Priority. Any date within two working days 
 - Services booked together get one checkout ("Accept & pay £X") on the client's job page; each service still keeps its own quote, payment record and report.
 - Pro fees are rounded to the nearest 50p, and Pros and admins see an itemised "How your fee is worked out" (attendance, expected time × level rate, allowances).
 - Pros never see client prices or payment amounts in job history.
+
+## Quote sent state and Update quote (25 Oct 2026)
+- Once a quote is issued, Admin sees "Quote vN sent to client" (sent time, client total, expiry, and whether it is waiting for the client, accepted awaiting payment, or expired) instead of an open editor. The status pill reads "Quote sent" (or "Invoice sent") for admins; clients still see "Quote ready".
+- "Update quote" opens the editor as vN+1 and needs a reason, which is shown to the client. Sending it supersedes the previous version (even an accepted one) and the client accepts the new version. Cancel discards the edits.
+- After payment there is no Update quote; extra work goes through a change order.

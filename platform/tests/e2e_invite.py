@@ -16,7 +16,7 @@ with sync_playwright() as pw:
     p.click('[data-act=role][data-r=admin]'); W()
     p.fill('#au-name', 'Ops'); p.fill('#au-email', 'ops@listd.test'); p.fill('#au-password', 'Admin2026!'); p.fill('#au-confirm', 'Admin2026!')
     p.click('form[data-form=auth-admin-setup] button[type=submit]'); W(1200)
-    p.fill('#au-code', p.evaluate("() => totp(S.auth.secret)")); p.click('form[data-form=auth-mfa-setup] button[type=submit]'); W(900)
+    W(900)
     p.click('.a-side [data-go=pros]'); W()
     p.click('.a-head [data-act=pro-add]'); W(); p.screenshot(path=OUT + 'i1-add.png')
     p.fill('#pi-first', 'Tunde'); p.fill('#pi-email', 'Tunde.Bello@Example.test'); p.click('form[data-form=pro-invite] button[type=submit]'); W(600)
@@ -53,7 +53,7 @@ with sync_playwright() as pw:
     # cancel an invitation
     a = ctx.new_page(); a.goto(APP); a.wait_for_timeout(700); a.click('[data-act=role][data-r=admin]'); a.wait_for_timeout(300)
     a.fill('#au-email', 'ops@listd.test'); a.fill('#au-password', 'Admin2026!'); a.click('form[data-form=auth-signin] button[type=submit]'); a.wait_for_timeout(1200)
-    a.fill('#au-code', a.evaluate("() => totp(AUTH.accounts.find(x => x.role === 'admin').mfa.secret)")); a.click('form[data-form=auth-mfa] button[type=submit]'); a.wait_for_timeout(900)
+    a.wait_for_timeout(300)
     r = a.evaluate("async () => { var x = await cmdInvitePro('Kemi', 'kemi@example.test'); cmdCancelInvite(x.id); return [D.pros[x.id].status, proStatusLabel(D.pros[x.id])]; }")
     check(r == ['REJECTED', 'Invite cancelled'], 'cancel invitation ' + str(r))
     print('FAILS', [m for ok, m in res if not ok]); print('ERRORS', errs); br.close()

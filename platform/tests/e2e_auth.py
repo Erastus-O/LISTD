@@ -52,10 +52,10 @@ with sync_playwright() as pw:
     role('client'); log('client still signed in -> ' + h1())
     # Admin: set-up with authenticator, then sign out and sign in with code
     role('admin'); shot('a4-admin-setup'); log('admin first visit -> ' + h1())
-    opt(p, '#au-name', 'Ops Admin'); p.fill('#au-email', 'ops@listd.test'); p.fill('#au-password', 'Admin2026!'); opt(p, '#au-confirm', 'Admin2026!'); p.click('form[data-form=auth-admin-setup] button[type=submit]'); W(1300); shot('a5-mfa-setup'); log('mfa setup -> ' + h1())
-    p.fill('#au-code', '000000'); p.click('form[data-form=auth-mfa-setup] button[type=submit]'); W(600); log('bad code: ' + err())
-    p.fill('#au-code', p.evaluate("() => totp(S.auth.secret)")); p.click('form[data-form=auth-mfa-setup] button[type=submit]'); W(900); log('admin -> ' + h1())
-    secret = p.evaluate("() => AUTH.accounts.find(a => a.role === 'admin').mfa.secret")
+    opt(p, '#au-name', 'Ops Admin'); p.fill('#au-email', 'ops@listd.test'); p.fill('#au-password', 'Admin2026!'); opt(p, '#au-confirm', 'Admin2026!'); p.click('form[data-form=auth-admin-setup] button[type=submit]'); W(1300); log('admin after setup (2FA off by default) -> ' + h1() + ' mfa=' + str(p.evaluate("() => !!AUTH.accounts.find(a => a.role === 'admin').mfa")))
+    p.evaluate("go('settings', { tab: 'security' })"); W(); p.click('label.ld-switch:has([data-twofa])'); W(); shot('a5-mfa-setup'); log('switching on shows QR: %s' % bool(p.locator('#au-qr').count()))
+    p.fill('#mf-code', '000000'); p.click('form[data-form=mfa-on] button[type=submit]'); W(600)
+    secret = p.evaluate('S.mfaSetup.secret'); p.fill('#mf-code', p.evaluate('s => totp(s)', secret)); p.click('form[data-form=mfa-on] button[type=submit]'); W(800); log('admin 2FA turned on: ' + str(p.evaluate("() => !!AUTH.accounts.find(a => a.role === 'admin').mfa")))
     p.click('.a-top [data-act=signout]'); W(); signin('ops@listd.test', 'Admin2026!'); log('after password -> ' + h1()); shot('a6-mfa')
     p.fill('#au-code', p.evaluate("s => totp(s)", secret)); p.click('form[data-form=auth-mfa] button[type=submit]'); W(900); log('admin signed in -> ' + h1())
     # older profile (created before sign-in existed) can be claimed

@@ -45,8 +45,8 @@ function cmdIssueQuote(j, q, reason) {
   if (q.proFeeP < 0 || q.proFeeP > t.total) return deny('The Pro fee must be between £0 and the client total.');
   var quotes = (j.quotes || []).map(function (x) { return (x.status === 'ISSUED' || x.status === 'ACCEPTED') ? Object.assign({}, x, { status: 'SUPERSEDED' }) : x; });
   var v = quotes.length + 1; quotes.push(Object.assign({}, q, { v: v, subP: t.sub, totalP: t.total, status: 'ISSUED', issuedAt: now(), expiresAt: addH(now(), (q.validDays || settings().quoteValidityDays) * 24) }));
-  upd(j, { quotes: quotes, status: 'QUOTED' }, qWord(j, true) + ' v' + v + ' issued: ' + P(t.total), 'admin');
-  audit('quote.issue', 'job', j.id, reason || 'Quote issued', { v: v, totalP: t.total, proFeeP: q.proFeeP }); notifyJob(j, 'client', j.ref + ': your ' + qWord(j) + ' is ready (' + P(t.total) + ')'); return true;
+  upd(j, { quotes: quotes, status: 'QUOTED' }, qWord(j, true) + ' v' + v + (v > 1 ? ' updated and sent: ' : ' issued: ') + P(t.total) + (q.why ? ' (' + q.why + ')' : ''), 'admin');
+  audit('quote.issue', 'job', j.id, reason || 'Quote issued', { v: v, totalP: t.total, proFeeP: q.proFeeP }); notifyJob(j, 'client', j.ref + ': your ' + (v > 1 ? 'updated ' : '') + qWord(j) + ' is ready (' + P(t.total) + ')'); return true;
 }
 function cmdAcceptQuote(j) {
   var q = curQuote(j); if (!q || q.status !== 'ISSUED' || j.status !== 'QUOTED') return deny('This quote is no longer current.');

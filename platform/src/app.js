@@ -214,6 +214,8 @@ document.addEventListener('click', function (e) {
     case 'inv-pay': if (cmdAcceptQuote(j) && cmdPay(D.jobs[j.id])) toast('Invoice paid (test)'); break;
     case 'q-reject': M('q-reject'); break;
     case 'pay': if (cmdPay(j)) toast('Payment confirmed (test)'); break;
+    case 'q-edit': if (!sentQuote(j)) break; S.qEdit = S.qEdit || {}; S.qEdit[id] = 1; if (S.qd) delete S.qd[id]; render(); break;
+    case 'q-edit-cancel': if (S.qEdit) delete S.qEdit[id]; if (S.qd) delete S.qd[id]; render(); break;
     case 'grp-pay': var gn = cmdGroupPay(j); if (gn) toast(gn + ' services paid together (test)'); break;
     case 'pay-fail': cmdPay(j, true); toast('Payment failed (simulated). Booking not confirmed.'); break;
     case 'r-accept': if (cmdAcceptReport(j, 'EXPLICIT')) toast('Report accepted'); break;
@@ -378,7 +380,7 @@ document.addEventListener('submit', function (e) {
     case 'delete-request': var dcol = S.role === 'pro' ? 'pros' : 'clients', did = S.role === 'pro' ? S.proId : S.clientId; patchDoc(dcol, did, { deletion: { at: now(), reason: v('reason') } }); notify('admin', (myProfile().orgName || myProfile().name) + ' asked to close their ' + (S.role === 'pro' ? 'Pro' : 'client') + ' account'); audit('account.deletion_requested', S.role, did, v('reason') || 'No reason given'); toast('Request sent to LISTD'); break;
     case 'clock-out': if (cmdClockOut(j, (S.clockPhoto || {})[id + ':out'], v('breakMin'), v('notes'), v('exception'))) toast('Clocked out'); break;
     /* admin */
-    case 'quote': var qd = readQuoteForm(f, j); if (qd.lines.some(function (l) { return !l.d; })) { toast('Every line needs a description.'); return; } if (cmdIssueQuote(j, JSON.parse(JSON.stringify(qd)))) { delete S.qd[id]; toast(qWord(j, true) + ' issued'); } break;
+    case 'quote': var qd = readQuoteForm(f, j); if (qd.lines.some(function (l) { return !l.d; })) { toast('Every line needs a description.'); return; } var upd0 = !!sentQuote(j), why = String(new FormData(f).get('why') || '').trim(); if (upd0 && !why) { toast('Add a reason for the update.'); return; } if (upd0) qd.why = why; if (cmdIssueQuote(j, JSON.parse(JSON.stringify(qd)), why || null)) { delete S.qd[id]; if (S.qEdit) delete S.qEdit[id]; toast(qWord(j, true) + (upd0 ? ' updated and sent to the client' : ' sent to the client')); } break;
     case 'ask': cmdAskInfo(j, reason(f)); break;
     case 'offer': var ow = { date: v('date'), slot: v('slot') }, fee = toP(v('fee')), aq = acceptedQuote(j); if (cmdOffer(j, v('proId'), ow, fee)) { if (aq && fee !== aq.proFeeP) audit('offer.fee_change', 'job', id, 'Pro fee changed from quote', { fromP: aq.proFeeP, toP: fee }); toast('Offer sent'); } break;
     case 'revoke': cmdRevoke(j, reason(f)); break;

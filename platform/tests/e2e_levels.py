@@ -41,7 +41,7 @@ with sync_playwright() as pw:
         role('admin')
         opt(p, '#au-name', 'Ops Admin'); p.fill('#au-email', 'ops@listd.test'); p.fill('#au-password', 'Admin2026!'); opt(p, '#au-confirm', 'Admin2026!')
         p.click('form[data-form=auth-admin-setup] button[type=submit]'); W(1200)
-        p.fill('#au-code', ev("() => totp(S.auth.secret)")); p.click('form[data-form=auth-mfa-setup] button[type=submit]'); W(900)
+        W(900)
         nav('training'); shot('L01-training-empty')
         p.click('[data-act=t-new]'); W(); p.fill('#tr-title', 'Check-in inventory standards'); p.fill('#tr-desc', 'How LISTD writes rooms, items and condition.')
         p.locator('input[data-up*=training]').set_input_files(PDF); W(900)
@@ -88,9 +88,13 @@ with sync_playwright() as pw:
         check(ev("() => requiredLevel({ type: 'CHECK_IN', propSnapshot: { bedrooms: 2 } })") == 4 and ev("() => requiredLevel({ type: 'CHECK_OUT', propSnapshot: { bedrooms: 4 } })") == 5 and ev("() => requiredLevel({ type: 'MAINTENANCE', kind: 'CLEANING', scope: { clean: 'deep' } })") == 3, 'required levels by job type')
         check('Needs Level 4' in ev("() => String(eligible(Object.values(D.pros)[0], { type: 'CHECK_IN', district: 'BA1', propSnapshot: { bedrooms: 2 } }, null))"), 'Level 1 Pro not eligible for check-in')
         # policies: relax L2-L4 job/rating rules for the test
+        nav('settings'); p.fill('#pp-ph', '07700 900456'); p.locator('form[data-form=price-phone] button[type=submit]').click(); W(500)
+        _c = __import__('re').search(r'(\d{6})', p.locator('.a-modal .a-banner').inner_text()).group(1); p.fill('#pc-code', _c); p.locator('form[data-form=price-code] button[type=submit]').click(); W(500)
         nav('policies')
         for k in ['2', '3', '4']: p.fill('#pol-lv_%s_jobs' % k, '0'); p.fill('#pol-lv_%s_rating' % k, '0')
         p.fill('#pol-why', 'Test thresholds'); p.locator('form[data-form=policies] button[type=submit]').click(); W()
+        check(ev("() => lvRule(4).minJobs") != 0 and p.locator('.a-modal').count() == 1, 'policy change waits for the code to the Main admin phone')
+        _c = __import__('re').search(r'(\d{6})', p.locator('.a-modal .a-banner').inner_text()).group(1); p.fill('#pc-code', _c); p.locator('form[data-form=price-code] button[type=submit]').click(); W(500)
         check(ev("() => lvRule(4).minJobs") == 0, 'level rules saved in policies')
         # ---- pro: training page, apply L2
         role('pro'); nav('training'); shot('L06-pro-training')
