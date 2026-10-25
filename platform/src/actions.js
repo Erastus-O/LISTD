@@ -10,15 +10,29 @@ function cmdSubmit(w) {
   var p = D.properties[w.propertyId]; if (!p || p.clientId !== S.clientId) return deny('Choose one of your properties.');
   if (w.type === 'MAINTENANCE' && !KINDS[w.kind]) return deny('Choose Repairs & Damages or Cleaning.');
   if (w.type !== 'MAINTENANCE') w.kind = null;
-  var scope = Object.assign({}, w.scope); if (w.kind !== 'CLEANING') delete scope.clean;
-  var base = w.type === 'CHECK_OUT' ? findBaseline(p.id) : null;
+  var key = w.type === 'MAINTENANCE' ? w.kind : w.type, keep = ['access', 'schedNote', 'sched', 'flexDates'].concat(isInspK(key) ? ['rooms', 'keys', 'occupant', 'tenantContact', 'contents', 'sameVisit'] : key === 'CLEANING' ? ['clean', 'condition', 'notes', 'addons', 'carpetRooms', 'areaM2', 'frequency', 'facilities'] : ['category', 'location', 'description', 'severity', 'noPhotoReason', 'repairMode']), scope = {};
+  keep.forEach(function (f) { if (w.scope && w.scope[f] != null && w.scope[f] !== '') scope[f] = w.scope[f]; });
+  if (w.sched) scope.sched = w.sched; if (w.flexDates) scope.flexDates = w.flexDates;
+  scope.sameVisit = !!(w.sameVisit && (w.type === 'INVENTORY' || w.type === 'CHECK_IN')); if (!scope.sameVisit) delete scope.sameVisit;
+  var base = ['CHECK_OUT', 'MID_TERM', 'CHECK_IN'].indexOf(w.type) >= 0 ? findBaseline(p.id, null, w.type) : null;
   var id = uid(), j = { ref: nextRef(), clientId: S.clientId, propertyId: p.id, district: district(p.postcode), type: w.type, kind: w.kind, scope: scope, window: { date: w.date, slot: w.slot },
-    propSnapshot: { label: p.label, address: p.address, postcode: p.postcode, type: p.type, bedrooms: p.bedrooms, bathrooms: p.bathrooms, furnishing: p.furnishing },
+    propSnapshot: (function () { var r = (w.rooms && w.rooms.pid === p.id) ? w.rooms : {}; return { label: p.label, address: p.address, postcode: p.postcode, type: p.type, bedrooms: r.bedrooms != null ? r.bedrooms : p.bedrooms, bathrooms: r.bathrooms != null ? r.bathrooms : p.bathrooms, kitchens: r.kitchens != null ? r.kitchens : p.kitchens, receptions: r.receptions != null ? r.receptions : p.receptions, furnishing: r.furnishing || p.furnishing, furnishedRooms: r.furnishedRooms != null ? r.furnishedRooms : p.furnishedRooms, area: p.area, outbuildings: p.outbuildings, outdoor: p.outdoor }; })(),
     baselineId: base ? base.id : null, linkedId: w.linkedId || null, status: 'SUBMITTED', quotes: [], payments: [], refunds: [], offers: [], reports: [], disputes: [], changeOrders: [], info: [], createdAt: now(), updatedAt: now(),
-    history: [{ at: now(), role: 'client', text: 'Request submitted' + (w.type === 'CHECK_OUT' ? (base ? '. Baseline: check-in ' + base.ref : '. No baseline check-in on record — comparison unavailable') : '') }] };
+    groupId: w.groupId || null, history: [{ at: now(), role: 'client', text: 'Request submitted' + (comparesK(w.type) ? (base ? '. Baseline: ' + SVC[base.type].label.toLowerCase() + ' ' + base.ref : '. No earlier check-in or inventory on record — comparison unavailable') : '') + (w.groupId ? '. Booked together with other services' : '') }] };
   (w.photoIds || []).forEach(function (eid) { patchDoc('evidence', eid, { jobId: id }); });
-  setDoc('jobs', id, j); notify('admin', 'New ' + SVC[svcKey(j)].label + ' request ' + j.ref + ' to quote', id);
+  setDoc('jobs', id, j);
+  if (!cmdAutoQuote(D.jobs[id])) notify('admin', 'New ' + SVC[svcKey(j)].label + ' request ' + j.ref + ' to quote', id); else notify('admin', 'New ' + SVC[svcKey(j)].label + ' request ' + j.ref + ' (fixed price issued)', id);
   return id;
+}
+/* several services in one booking: one request per service, linked by groupId, each with its own quote or invoice */
+function cmdSubmitMany(w) {
+  var svcs = (w.services || []).filter(function (k) { return SVC[k]; }); if (!svcs.length) return deny('Choose at least one service.');
+  var gid = svcs.length > 1 ? uid() : null, ids = [], same = svcs.indexOf('INVENTORY') >= 0 && svcs.indexOf('CHECK_IN') >= 0 && (w.scope || {}).sameVisit !== false, photoTo = svcs.indexOf('REPAIRS_DAMAGES') >= 0 ? 'REPAIRS_DAMAGES' : svcs[0];
+  for (var i = 0; i < svcs.length; i++) {
+    var k = svcs[i], one = Object.assign({}, w, { type: svcType(k), kind: svcType(k) === 'MAINTENANCE' ? k : null, groupId: gid, sameVisit: same, photoIds: k === photoTo ? w.photoIds : [], linkedId: w.linkedId || (ids[0] || null) });
+    var id = cmdSubmit(one); if (!id) return ids.length ? ids : false; ids.push(id);
+  }
+  return ids;
 }
 function cmdAskInfo(j, q) { if (['SUBMITTED', 'NEEDS_INFORMATION', 'QUOTED'].indexOf(j.status) < 0) return deny('Clarification is only possible before payment.'); var info = (j.info || []).concat([{ at: now(), q: q, a: '' }]); upd(j, { status: 'NEEDS_INFORMATION', info: info }, 'LISTD asked: ' + q, 'admin'); audit('request.ask_info', 'job', j.id, q); notifyJob(j, 'client', j.ref + ': LISTD needs more information'); return true; }
 function cmdRespond(j, a) { if (j.status !== 'NEEDS_INFORMATION') return false; var info = (j.info || []).slice(); info[info.length - 1] = Object.assign({}, info[info.length - 1], { a: a, aAt: now() }); upd(j, { status: 'SUBMITTED', info: info }, 'Client replied: ' + a, 'client'); notify('admin', j.ref + ': client replied', j.id); return true; }
@@ -191,7 +205,10 @@ function cmdReleasePayout(j) {
 
 /* ---- change orders ---- */
 function cmdProposeCO(j, desc, estP, evIds) { if (['IN_PROGRESS', 'SCHEDULED'].indexOf(j.status) < 0 || j.proId !== S.proId) return deny('Change orders can be proposed on your active job.'); upd(j, { changeOrders: (j.changeOrders || []).concat([{ id: uid(), desc: desc, estimateP: estP, evidence: evIds || [], status: 'PROPOSED', at: now() }]) }, 'Pro proposed extra work: ' + desc, 'pro'); notify('admin', j.ref + ': change order to price', j.id); return true; }
-function cmdIssueCO(j, coId, totalP, feeP) { var i = (j.changeOrders || []).findIndex(function (c) { return c.id === coId; }); if (i < 0 || j.changeOrders[i].status !== 'PROPOSED') return false; if (totalP <= 0 || feeP < 0 || feeP > totalP) return deny('Check the price and Pro fee.'); upd(j, { changeOrders: replaceIn(j.changeOrders, i, { status: 'ISSUED', totalP: totalP, proFeeP: feeP, issuedAt: now() }) }, 'Change order priced at ' + P(totalP), 'admin'); audit('change_order.issue', 'job', j.id, j.changeOrders[i].desc, { totalP: totalP, feeP: feeP }); notifyJob(j, 'client', j.ref + ': extra work needs your approval'); return true; }
+function cmdIssueCO(j, coId, totalP, feeP) { var i = (j.changeOrders || []).findIndex(function (c) { return c.id === coId; }); if (i < 0 || j.changeOrders[i].status !== 'PROPOSED') return false; if (totalP <= 0 || feeP < 0 || feeP > totalP) return deny('Check the price and Pro fee.');
+  /* a paid diagnostic visit is credited once, against the first repair priced after it */
+  var aq = acceptedQuote(j), credit = (j.scope || {}).repairMode === 'diagnose' && paidP(j) > 0 && !(j.changeOrders || []).some(function (c) { return c.creditP; }) ? Math.min(totalP, aq ? aq.subP : pricing().repairs.diagnosisP) : 0;
+  upd(j, { changeOrders: replaceIn(j.changeOrders, i, { status: 'ISSUED', grossP: totalP, creditP: credit, totalP: totalP - credit, proFeeP: feeP, issuedAt: now() }) }, 'Change order priced at ' + P(totalP) + (credit ? ', less the ' + P(credit) + ' diagnosis credit' : ''), 'admin'); audit('change_order.issue', 'job', j.id, j.changeOrders[i].desc, { totalP: totalP, feeP: feeP }); notifyJob(j, 'client', j.ref + ': extra work needs your approval'); return true; }
 function cmdCOReply(j, coId, accept) {
   var i = (j.changeOrders || []).findIndex(function (c) { return c.id === coId; }), c = j.changeOrders[i]; if (!c || c.status !== 'ISSUED') return false;
   if (!accept) { upd(j, { changeOrders: replaceIn(j.changeOrders, i, { status: 'DECLINED' }) }, 'Client declined extra work. Original scope stands', 'client'); notifyJob(j, 'pro admin', j.ref + ': change order declined'); return true; }

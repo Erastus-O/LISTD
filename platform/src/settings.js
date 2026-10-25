@@ -23,7 +23,7 @@ function secHeadS(title, sub) { return '<div class="a-sethead"><h2>' + esc(title
 
 /* ---- client ---- */
 function setAccount() {
-  if (S.role === 'admin') { var a = myAuthAccount() || {}; return secHeadS('Account', 'Your LISTD staff account.') + '<form class="a-card a-form" data-form="set-admin"><div class="two">' + field('st-name', 'Full name', inp('st-name', 'name', a.name || '', 'required autocomplete="name"')) + field('st-em', 'Sign-in email', inp('st-em', 'x', a.email || '', 'disabled')) + '</div><p class="a-fine">Change your sign-in email under Sign-in & security.</p><div class="a-actions"><button class="ld-btn ld-btn-primary" type="submit">Save</button></div></form>'; }
+  if (S.role === 'admin') { var a = myAuthAccount() || {}; return secHeadS('Account', 'Your LISTD staff account.') + '<form class="a-card a-form" data-form="set-admin"><div class="two">' + field('st-name', 'Full name', inp('st-name', 'name', a.name || '', 'required autocomplete="name"')) + field('st-em', 'Sign-in email', inp('st-em', 'x', a.email || '', 'disabled')) + '</div><p class="a-fine">Change your sign-in email under Sign-in & security.</p><div class="a-actions"><button class="ld-btn ld-btn-primary" type="submit">Save</button></div></form>' + (isMainAdmin() ? pricePhoneCard() : ''); }
   var c = me(), isOrg = c.segment && c.segment !== 'LANDLORD';
   return secHeadS('Account', 'Your details and account type.') + '<form class="a-card a-form" data-form="set-account"><div class="two">' + field('st-name', 'Full name', inp('st-name', 'name', c.name, 'required autocomplete="name"')) + field('st-phone', 'Phone', inp('st-phone', 'phone', c.phone, 'type="tel" autocomplete="tel"')) + '</div>' +
     (c.segment ? field('st-org', isOrg ? 'Organisation name' : 'Business name <small>Optional</small>', inp('st-org', 'orgName', c.orgName, isOrg ? 'required' : '')) : '') +
@@ -58,11 +58,11 @@ function setPayouts() {
 /* ---- shared ---- */
 function setSecurity() {
   var a = myAuthAccount(); if (!a) return '<p class="a-muted">Sign in again to manage security.</p>';
-  var on = !!a.mfa, setup = S.mfaSetup, off = S.mfaOff, adminLocked = S.role === 'admin';
+  var on = !!a.mfa, setup = S.mfaSetup, off = S.mfaOff;
   var h = secHeadS('Sign-in & security', 'Keep your account safe.');
   h += '<form class="a-card a-form" data-form="set-email"><h3>Sign-in email</h3><p class="a-muted">Currently <b>' + esc(a.email) + '</b>.</p><div class="two">' + field('se-new', 'New email', inp('se-new', 'email', '', 'type="email" required autocomplete="email"')) + pwField('se-pw', 'Current password', 'current-password').replace('name="se-pw"', 'name="password"') + '</div><div class="a-actions"><button class="ld-btn ld-btn-secondary" type="submit">Change email</button></div></form>';
   h += '<form class="a-card a-form" data-form="auth-change" novalidate><h3>Password</h3><div class="two">' + pwField('au-current', 'Current password', 'current-password') + pwField('au-newpw', 'New password', 'new-password') + '</div><div class="a-actions"><button class="ld-btn ld-btn-secondary" type="submit">Change password</button></div><p class="a-fine">Changing your password signs you out on other devices.</p></form>';
-  h += '<div class="a-card a-form"><div class="a-row sb"><div><h3>Two-factor authentication</h3><p class="a-muted" style="margin:4px 0 0">' + (adminLocked ? 'Always on for admins.' : 'Ask for a 6-digit code from an authenticator app each time you sign in.') + '</p></div><label class="ld-switch"><input type="checkbox" role="switch" data-twofa="1" aria-label="Two-factor authentication"' + ((on || setup) ? ' checked' : '') + (adminLocked ? ' disabled' : '') + '><span class="t"></span><span>' + (on ? 'On' : setup ? 'Setting up' : 'Off') + '</span></label></div>';
+  h += '<div class="a-card a-form"><div class="a-row sb"><div><h3>Two-factor authentication</h3><p class="a-muted" style="margin:4px 0 0">' + (on ? 'On. You’ll be asked for a 6-digit code from your authenticator app each time you sign in.' : setup ? 'Finish the steps below to turn it on.' : 'Off. Switch it on to add a 6-digit code from an authenticator app to every sign-in.') + '</p></div><label class="ld-switch"><input type="checkbox" role="switch" data-twofa="1" aria-label="Two-factor authentication"' + ((on || setup) ? ' checked' : '') + '><span class="t"></span><span>' + (on ? 'On' : setup ? 'Setting up' : 'Off') + '</span></label></div>';
   if (setup) {
     var uri = 'otpauth://totp/LISTD:' + encodeURIComponent(a.email) + '?secret=' + setup.secret + '&issuer=LISTD&digits=6&period=30';
     h += '<div class="a-mfabox"><p>Scan this with Google Authenticator, Microsoft Authenticator or 1Password, or enter the key by hand. Then enter the 6-digit code to turn it on.</p><div class="a-qr" id="au-qr">' + (AUTH.qrFor === uri && AUTH.qrSvg ? AUTH.qrSvg : '<span class="a-fine">Loading QR code…</span>') + '</div><code class="a-key">' + setup.secret.replace(/(.{4})/g, '$1 ').trim() + '</code><form class="a-row" data-form="mfa-on" novalidate><label class="sr-only" for="mf-code">6-digit code</label><input class="a-note" style="max-width:160px" id="mf-code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456" required><button class="ld-btn ld-btn-primary ld-btn-sm" type="submit">Turn on</button><button class="ld-btn ld-btn-ghost ld-btn-sm" type="button" data-act="mfa-cancel">Cancel</button></form></div>';
@@ -129,7 +129,7 @@ async function settingsSubmit(kind, f) {
 }
 function settingsChange(el) {
   if (el.dataset.twofa) {
-    var a = myAuthAccount(); if (!a || S.role === 'admin') return;
+    var a = myAuthAccount(); if (!a) return;
     if (el.checked && !a.mfa) { S.mfaOff = false; S.mfaSetup = { secret: b32enc(randBytes(20)) }; }
     else if (!el.checked && a.mfa) { S.mfaSetup = null; S.mfaOff = true; }
     else if (!el.checked) S.mfaSetup = null;

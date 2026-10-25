@@ -74,7 +74,7 @@ async function buildInspectionPdf(j, r) {
   [co.address, co.phone, co.email].forEach(function (t, ix) { fill([84, 196, 120]); doc.circle(29.5, 53.5 + ix * 13.3, 3.4, 'F'); font('normal', 6.3); color([40, 40, 40]); doc.text(t, 38, 55.6 + ix * 13.3); });
   var dIso = (j.attendance && j.attendance.inAt) || r.submittedAt || now();
   font('bold', 12); color(CORAL); doc.text(longDate(dIso), W - 13, 62, { align: 'right' });
-  var title = k === 'CHECK_OUT' ? 'Check Out & Schedule of Condition' : 'Inventory & Schedule of Condition';
+  var title = ({ INVENTORY: 'Inventory & Schedule of Condition', CHECK_IN: 'Check In & Schedule of Condition', MID_TERM: 'Mid-Term Inspection Report', CHECK_OUT: 'Check Out & Schedule of Condition' })[k] || 'Inventory & Schedule of Condition';
   font('bold', 15); doc.text(title, W / 2, 133, { align: 'center' });
   font('bold', 10); doc.text(addr, W / 2, 165, { align: 'center' });
   if (coverImg) doc.addImage(coverImg, 'JPEG', 81, 182, 434, 325, undefined, 'FAST');
@@ -87,7 +87,7 @@ async function buildInspectionPdf(j, r) {
   doc.addPage(); pageHeader(); var tocPage = doc.getNumberOfPages();
   /* ---- executive summary ---- */
   doc.addPage(); pageHeader(); y = 41; bar('Executive Summary'); y += 14;
-  if (k === 'CHECK_OUT') { var bl = r.baselineId && D.jobs[r.baselineId] ? 'Compared with the check-in report ' + D.jobs[r.baselineId].ref + '. Observations are not liability findings or deposit deductions.' : 'Comparison unavailable: no baseline check-in report was on record for this property.'; font('bold', 9.5); color(TXT); var bll = doc.splitTextToSize(bl, CW - 16); doc.text(bll, M + 8, y + 8); y += bll.length * 12 + 12; }
+  if (comparesK(k)) { var bl = r.baselineId && D.jobs[r.baselineId] ? 'Compared with the ' + baseLabel(r) + ' report. Observations are not liability findings or deposit deductions.' : 'Comparison unavailable: no earlier check-in or inventory report was on record for this property.'; font('bold', 9.5); color(TXT); var bll = doc.splitTextToSize(bl, CW - 16); doc.text(bll, M + 8, y + 8); y += bll.length * 12 + 12; }
   if (s.summary) { font('normal', 9.5); color(TXT); var sl = doc.splitTextToSize(s.summary, CW - 16); doc.text(sl, M + 8, y + 8, { lineHeightFactor: 1.35 }); }
   /* ---- interpretations ---- */
   doc.addPage(); pageHeader(); y = 41; toc.push(['Interpretations', doc.getNumberOfPages(), 0]); bar('Interpretations'); y += 26;
@@ -124,7 +124,7 @@ async function buildInspectionPdf(j, r) {
     if (!rm.items.length) row([['', CW]], [{ t: 'No items associated with this room.' }], false);
     rm.items.forEach(function (it, ii) {
       var ref = n + '.' + (ii + 1), ph = ev.filter(function (e) { return e.item === it.id; }), cond = it.condNote || '';
-      if (k === 'CHECK_OUT' && it.find && it.find !== 'none') cond += (cond ? ' ' : '') + 'Compared with check-in: ' + FIND[it.find] + '.';
+      if (comparesK(k) && it.find && it.find !== 'none') cond += (cond ? ' ' : '') + 'Compared with ' + (D.jobs[r.baselineId] ? SVC[svcKey(D.jobs[r.baselineId])].label.toLowerCase() : 'earlier report') + ': ' + FIND[it.find] + '.';
       var b = bmap[rm.name + '|' + it.name]; if (b && b.condNote) cond += (cond ? '\n\n' : '') + 'At check-in: ' + b.condNote;
       row(IC, [{ t: ref, style: 'bold', size: 7 }, { t: it.name }, { t: it.desc }, { t: cond, tag: it.action ? ACTIONS[it.action] + ' - Investigate' : '' }], ii % 2 === 0, ph.length > 0);
       photos(ph, ref);
@@ -143,6 +143,7 @@ async function buildInspectionPdf(j, r) {
   /* declaration */
   doc.addPage(); pageHeader(); y = 41; toc.push(['Declaration', doc.getNumberOfPages(), 0]); bar('Declaration'); y += 22;
   font('normal', 9); color(TXT); doc.text(doc.splitTextToSize(DECLARATION, CW - 12), M + 6, y, { lineHeightFactor: 1.35 });
+  if (signoffK(k) && s.signoff && s.signoff.status) { var sy = y + 62; font('bold', 9.5); doc.text('Tenant walk-through & sign-off', M + 6, sy); font('normal', 9); doc.text(doc.splitTextToSize((s.signoff.name || 'Tenant') + ' · ' + (SIGNOFF[s.signoff.status] || '') + (s.signoff.note ? '. Comments: ' + s.signoff.note : ''), CW - 12), M + 6, sy + 14, { lineHeightFactor: 1.35 }); }
   var anyAi = s.rooms.some(function (rm) { return rm.items.some(function (it) { return it.source; }); });
   if (anyAi) { font('italic', 7.5); color(GREY); doc.text('Some descriptions were drafted with AI from the clerk’s photos and checked and confirmed by the clerk on site.', M + 6, y + 40); }
 
@@ -160,7 +161,7 @@ async function buildInspectionPdf(j, r) {
 async function downloadInspectionPdf(j, r) {
   toast('Building the PDF report…');
   try {
-    var blob = await buildInspectionPdf(j, r), p = j.propSnapshot || {}, name = (p.address || j.ref).replace(/[^\w\s-]/g, '').trim().slice(0, 60) + ' - ' + (svcKey(j) === 'CHECK_OUT' ? 'CHECK OUT' : 'INVENTORY') + ' REPORT v' + r.v + '.pdf';
+    var blob = await buildInspectionPdf(j, r), p = j.propSnapshot || {}, name = (p.address || j.ref).replace(/[^\w\s-]/g, '').trim().slice(0, 60) + ' - ' + ({ INVENTORY: 'INVENTORY', CHECK_IN: 'CHECK IN', MID_TERM: 'MID-TERM', CHECK_OUT: 'CHECK OUT' }[svcKey(j)] || 'INVENTORY') + ' REPORT v' + r.v + '.pdf';
     if (ENV.downloads) { try { await ENV.downloads.save({ filename: name, data: blob }); return; } catch (e) { if (e && e.code === 'declined') return; } }
     var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
   } catch (e) { toast('Couldn’t build the PDF. Check your connection and try again.'); }

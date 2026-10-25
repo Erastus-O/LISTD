@@ -82,7 +82,7 @@ function unlinkedProfiles(role) {
 var AUTH_COPY = {
   client: { h: 'Every property service, one trusted record.', b: ['Book check-ins, check-outs, repairs and cleaning in minutes', 'Pay securely and only sign off when you’re happy', 'Timestamped photo reports for every visit'] },
   pro: { h: 'Get matched with verified work near you.', b: ['Offers that match your skills and area', 'Clear scope, fee and access details upfront', 'Paid when the client signs off'] },
-  admin: { h: 'LISTD operations', b: ['Invite-only access for LISTD staff', 'Two-step sign-in with an authenticator app', 'Every privileged action is logged'] }
+  admin: { h: 'LISTD operations', b: ['Invite-only access for LISTD staff', 'Optional two-factor sign-in with an authenticator app', 'Every privileged action is logged'] }
 };
 function pwField(id, label, auto, extra) {
   return '<div class="ld-field"><div class="a-row sb"><label class="ld-label" for="' + id + '">' + label + '</label>' + (extra || '') + '</div><div class="ld-control"><input class="ld-input" id="' + id + '" name="' + id.replace(/^au-/, '') + '" type="password" required autocomplete="' + auto + '"' + (auto === 'new-password' && !/confirm/.test(id) ? ' data-pw="1" aria-describedby="' + id + '-rules"' : '') + '><button type="button" class="a-eye" data-act="pw-toggle" data-for="' + id + '" aria-label="Show password" aria-pressed="false">' + ic('eye', 18) + '</button></div>' +
@@ -125,7 +125,7 @@ function vAuth() {
       '<form class="a-form" data-form="auth-invite" novalidate>' + field('au-code', 'Invitation code', inp('au-code', 'code', A.code || '', 'required autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" placeholder="ABCD-2345" class="num"')) + field('au-email', 'Email', inp('au-email', 'email', A.email || '', 'type="email" required autocomplete="username" autocapitalize="none" spellcheck="false"')) +
       pwField('au-password', 'Create a password', 'new-password') + '<button class="ld-btn ld-btn-primary ld-btn-lg ld-btn-full" type="submit">Verify and continue</button></form><p class="a-authalt">Already set up? <button type="button" class="a-linkbtn" data-act="auth-mode" data-m="signin">Sign in</button></p>';
   } else if (mode === 'admin-setup') {
-    f = '<h1>Set up admin sign-in</h1><p class="a-muted">You have admin access to this workspace. Create your sign-in, then link an authenticator app.</p>' + authErr() + '<form class="a-form" data-form="auth-admin-setup" novalidate>' + field('au-name', 'Full name', inp('au-name', 'name', '', 'required autocomplete="name"')) + field('au-email', 'Work email', inp('au-email', 'email', '', 'type="email" required autocomplete="email"')) + pwField('au-password', 'Create a password', 'new-password') + pwField('au-confirm', 'Confirm password', 'new-password') + '<button class="ld-btn ld-btn-primary ld-btn-lg ld-btn-full" type="submit">Continue</button></form>' + (AUTH.accounts.some(function (a) { return a.role === 'admin'; }) ? '<p class="a-authalt"><button type="button" class="a-linkbtn" data-act="auth-mode" data-m="signin">Back to sign in</button></p>' : '');
+    f = '<h1>Set up admin sign-in</h1><p class="a-muted">You have admin access to this workspace. Create your sign-in. You can turn on two-factor authentication later in Settings.</p>' + authErr() + '<form class="a-form" data-form="auth-admin-setup" novalidate>' + field('au-name', 'Full name', inp('au-name', 'name', '', 'required autocomplete="name"')) + field('au-email', 'Work email', inp('au-email', 'email', '', 'type="email" required autocomplete="email"')) + pwField('au-password', 'Create a password', 'new-password') + pwField('au-confirm', 'Confirm password', 'new-password') + '<button class="ld-btn ld-btn-primary ld-btn-lg ld-btn-full" type="submit">Continue</button></form>' + (AUTH.accounts.some(function (a) { return a.role === 'admin'; }) ? '<p class="a-authalt"><button type="button" class="a-linkbtn" data-act="auth-mode" data-m="signin">Back to sign in</button></p>' : '');
   } else if (mode === 'mfa-setup') {
     var sec = A.secret, uri = 'otpauth://totp/LISTD:' + encodeURIComponent(A.email) + '?secret=' + sec + '&issuer=LISTD&digits=6&period=30';
     f = '<h1>Link an authenticator app</h1><p class="a-muted">Scan the code with Google Authenticator, Microsoft Authenticator or 1Password, or enter the key by hand.</p>' + authErr() +
@@ -168,7 +168,8 @@ async function authSubmit(kind, f) {
       }
       if (!ok) { AUTH.fails++; if (AUTH.fails >= 5) { AUTH.lockUntil = Date.now() + 30000; AUTH.fails = 0; setTimeout(render, 30500); } S.auth = { mode: 'signin', email: email }; return authFail('Email or password is incorrect.'); }
       AUTH.fails = 0;
-      if (role === 'admin' || acc.mfa) { AUTH.pending = acc.id; AUTH.pendingKeep = !!fd.get('keep'); return authMode('mfa'); }
+      if (acc.mfa) { AUTH.pending = acc.id; AUTH.pendingKeep = !!fd.get('keep'); return authMode('mfa'); }
+      if (role === 'admin') { startSession(acc, false); audit('admin.sign_in', 'admin', acc.id, acc.email); S.auth = null; S.authErr = ''; S.view = 'home'; HIST = []; render(); toast('Signed in'); return; }
       if (!(role === 'pro' ? D.pros[acc.profileId] : D.clients[acc.profileId])) return authFail('This account’s profile was removed. Contact LISTD.');
       startSession(acc, !!fd.get('keep')); S.auth = null; S.authErr = ''; S.view = 'home'; HIST = []; render(); toast('Signed in'); return;
     }
@@ -182,7 +183,7 @@ async function authSubmit(kind, f) {
       if (!proUp && pw !== confirm) return authFail('The passwords don’t match.');
       if (kind === 'auth-signup' && !proUp && !fd.get('terms')) return authFail('Agree to the terms to continue.');
       if (authAcc(role, email)) return authFail('An account with this email already exists. Sign in instead.');
-      if (kind === 'auth-admin-setup') { var adm = await newAccount('admin', email, pw, null); adm.name = name; AUTH.pending = adm; return authMode('mfa-setup', { email: email, secret: b32enc(randBytes(20)) }); }
+      if (kind === 'auth-admin-setup') { var adm = await newAccount('admin', email, pw, null); adm.name = name; AUTH.accounts.push(adm); await authSave(); audit('admin.setup', 'admin', adm.id, adm.email); startSession(adm, false); S.auth = null; S.authErr = ''; S.view = 'home'; HIST = []; render(); toast('Admin sign-in set up. You can turn on two-factor in Settings.'); return; }
       var pid = kind === 'auth-claim' ? v('profile') : uid();
       if (kind === 'auth-signup') {
         if (role === 'pro') setDoc('pros', pid, { name: name, email: email, status: 'DRAFT', consent: {}, ownerUid: ENV.uid || null, onboarding: { status: 'IN_PROGRESS', step: 2 }, createdAt: now() });

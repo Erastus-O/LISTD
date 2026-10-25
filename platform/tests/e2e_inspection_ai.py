@@ -42,7 +42,7 @@ with sync_playwright() as pw:
     def admin_setup():
         opt(p, '#au-name', 'Ops Admin'); p.fill('#au-email', 'ops@listd.test'); p.fill('#au-password', 'Admin2026!'); opt(p, '#au-confirm', 'Admin2026!')
         p.click('form[data-form=auth-admin-setup] button[type=submit]'); p.wait_for_timeout(1200)
-        p.fill('#au-code', p.evaluate("() => totp(S.auth.secret)")); p.click('form[data-form=auth-mfa-setup] button[type=submit]'); p.wait_for_timeout(900)
+        p.wait_for_timeout(900)
     try:
         p.goto(APP); W(500); shot(p,'00-signin')
         # ---- client onboarding
@@ -52,7 +52,7 @@ with sync_playwright() as pw:
         p.fill('#p-lbl','Pulteney Flat 3'); p.fill('#p-addr','Flat 3, 22 Pulteney Street, Bath'); p.fill('#p-pc','ba2 4ds'); p.fill('#p-bed','2'); p.select_option('#p-furn','furnished'); p.fill('#p-acode','Key safe 4821'); p.fill('#p-cn','Jo Tenant'); p.fill('#p-cp','07700 900001'); shot(p,'02-ob-prop'); btn('Save property')
         shot(p,'03-ob-review'); btn('Finish setup'); log('client onboarded')
         # ---- check-in request
-        nav('jobs'); p.locator('.a-main [data-go=new]').first.click(); W(); submit(); p.click('label.a-opt:has(input[value=CHECK_IN])'); submit(); p.fill('#w-keys','2 sets to tenant'); submit(); submit(); p.fill('#w-date',D1); submit(); shot(p,'04-wiz-review'); submit(); log('check-in submitted '+str(state('LJ-1001')))
+        nav('jobs'); p.locator('.a-main [data-go=new]').first.click(); W(); submit(); p.click('label.a-opt:has(input[value=CHECK_IN])'); submit(); opt(p, '#w-occ', 'Jo Tenant'); p.fill('#w-keys','2 sets to tenant'); submit(); submit(); p.fill('#w-date',D1); submit(); shot(p,'04-wiz-review'); submit(); log('check-in submitted '+str(state('LJ-1001')))
         # ---- admin quote
         role('admin'); admin_setup(); shot(p,'05-admin-home'); openref('LJ-1001'); shot(p,'06-quote-builder'); btn('Issue quote to client'); log('quoted '+str(state('LJ-1001')))
         role('client'); openref('LJ-1001'); shot(p,'07-client-quote'); btn('Accept quote'); btn('Simulate a failed payment'); log('failed pay '+str(state('LJ-1001'))); p.locator('[data-act=pay]').click(); W(); log('paid '+str(state('LJ-1001'))); p.locator('[data-act=pay]').count()==0 or log('PAY BUTTON STILL THERE')
@@ -96,7 +96,7 @@ with sync_playwright() as pw:
         while p.locator('[data-act=vet]').count() and cnt<200:
             p.locator('[data-act=vet]').first.click(); p.wait_for_timeout(60); cnt+=1
         log('vetted %d'%cnt); W(900); shot(p,'31-vetted')
-        btn('Submit report'); log('insp submitted '+str(state('LJ-1001')) + ' toast: ' + p.locator('#toast').inner_text())
+        p.fill('#so-name', 'Jo Tenant'); W(900); p.select_option('#so-st', 'signed'); W(); shot(p, '19a-signoff'); btn('Submit report'); log('insp submitted '+str(state('LJ-1001')) + ' toast: ' + p.locator('#toast').inner_text())
         role('admin'); openref('LJ-1001'); btn('Release to client')
         role('client'); openref('LJ-1001'); shot(p,'32-client-insp')
         with p.expect_download(timeout=120000) as dl: p.locator('[data-act=dl-report]').first.click()

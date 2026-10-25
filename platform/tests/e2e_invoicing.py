@@ -17,7 +17,7 @@ with sync_playwright() as pw:
     p.click('[data-act=role][data-r=admin]'); W()
     opt(p, '#au-name', 'Ops'); p.fill('#au-email','o@l.t'); p.fill('#au-password','Admin2026!'); opt(p, '#au-confirm', 'Admin2026!')
     p.click('form[data-form=auth-admin-setup] button[type=submit]'); W(1200)
-    p.fill('#au-code', p.evaluate("() => totp(S.auth.secret)")); p.click('form[data-form=auth-mfa-setup] button[type=submit]'); W(900)
+    W(900)
     p.evaluate("""() => { setDoc('clients','c1',{name:'Ada Okafor',orgName:'Okafor Lettings',segment:'LANDLORD',onboarding:{status:'DONE',step:5},createdAt:now()});
       setDoc('properties','p1',{clientId:'c1',label:'12 Kings Road',address:'12 Kings Road, Bath',postcode:'BA1 1AA',bedrooms:2,bathrooms:1,active:true,createdAt:now()});
       setDoc('jobs','j1',{ref:'LJ-1010',clientId:'c1',propertyId:'p1',type:'MAINTENANCE',kind:'REPAIRS_DAMAGES',status:'SUBMITTED',scope:{category:'Plumbing',location:'Bathroom',description:'Leak under basin',severity:'high'},propSnapshot:{label:'12 Kings Road',postcode:'BA1 1AA',bedrooms:2},window:{date:'',slot:'morning'},quotes:[],payments:[],history:[],createdAt:now()}); }""")

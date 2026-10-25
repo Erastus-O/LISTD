@@ -14,7 +14,7 @@ import os
 HERE = os.path.dirname(os.path.abspath(__file__))
 def read(*p): return open(os.path.join(HERE, *p), encoding='utf-8').read()
 
-SRC = ['core.js', 'auth.js', 'actions.js', 'client.js', 'job.js', 'pro.js', 'settings.js', 'inspect.js', 'pdf.js', 'admin.js', 'levels.js', 'staff.js', 'app.js']
+SRC = ['core.js', 'pricing.js', 'auth.js', 'actions.js', 'client.js', 'job.js', 'pro.js', 'settings.js', 'inspect.js', 'pdf.js', 'admin.js', 'analytics.js', 'levels.js', 'staff.js', 'app.js']
 CSS = ['tokens.css', 'components.css', 'app.css']
 TITLES = {None: 'listd Platform', 'client': 'listd for Clients', 'pro': 'listd for Pros', 'admin': 'listd Admin'}
 

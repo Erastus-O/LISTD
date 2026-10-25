@@ -57,8 +57,8 @@ with sync_playwright() as pw:
     shot('s5-pro')
     # Admin
     role('admin'); opt(p, '#au-name', 'Ops'); p.fill('#au-email', 'ops@listd.test'); p.fill('#au-password', 'Admin2026!'); opt(p, '#au-confirm', 'Admin2026!'); p.click('form[data-form=auth-admin-setup] button[type=submit]'); W(1200)
-    p.fill('#au-code', p.evaluate('() => totp(S.auth.secret)')); p.click('form[data-form=auth-mfa-setup] button[type=submit]'); W(900)
+    W(900)
     p.click('.a-side [data-go=settings]'); W(); log('admin settings tabs: ' + ', '.join(p.locator('.a-settab').all_inner_texts()))
-    tab('security'); log('admin 2FA locked on: checked=%s disabled=%s' % (p.locator('[data-twofa]').is_checked(), p.locator('[data-twofa]').is_disabled()))
+    tab('security'); log('admin 2FA off by default: checked=%s disabled=%s' % (p.locator('[data-twofa]').is_checked(), p.locator('[data-twofa]').is_disabled()))
     p.set_viewport_size({'width': 390, 'height': 844}); W(); shot('s6-mobile')
     print('ERRORS', errs); br.close()

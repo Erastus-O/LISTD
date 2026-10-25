@@ -26,13 +26,13 @@ The files are concatenated in this order (see `platform/build.py`). They share o
 | File | Responsibility |
 |---|---|
 | `core.js` | Global state `S`, data cache `D`, environment `ENV`, catalogue (services, cleaning types, segments, statuses, Pro levels), default policies, price guide, store (`setDoc`, `patchDoc`, live snapshots), audit and notifications, file upload, shared UI helpers |
-| `auth.js` | Sign-up, sign-in, Pro invitations (accept side), password reset, Admin TOTP two-step, sessions, legacy profile claiming |
+| `auth.js` | Sign-up, sign-in, Pro invitations (accept side), password reset, optional TOTP two-factor, sessions, legacy profile claiming |
 | `actions.js` | Every lifecycle command (`cmd*`) with its guards, plus timed rules (`sweep`) |
 | `client.js` | Client onboarding, properties, request wizard, payments, invoices |
 | `job.js` | Job detail page used by all three roles: progress rail, scope, quote or invoice, money, history, messages |
 | `pro.js` | Pro onboarding, dashboard, offers, schedule, earnings, report editor for cleaning and repairs |
 | `settings.js` | Settings for every role: account, billing, profile, work, documents, payouts, security, 2FA, notifications, theme, privacy |
-| `inspect.js` | Check-in and check-out report editor in the LISTD Inventory format, plus AI photo descriptions that the Pro must check |
+| `inspect.js` | Inventory, check-in, mid-term and check-out report editor in the LISTD Inventory format, with tenant walk-through sign-off for check-in and check-out, plus AI photo descriptions that the Pro must check |
 | `pdf.js` | Inventory & Schedule of Condition PDF (jsPDF 2.5.1 from cdnjs) |
 | `admin.js` | Admin overview, requests table, assignments calendar, reviews, disputes, finance, clients, properties, policies, audit, quote builder, offers, invoicing |
 | `levels.js` | Pro levels 1–5, training library, level applications, Pros table and Pro detail page, Pro invitations (admin side) |
@@ -70,7 +70,7 @@ Money is always integer pence (`...P`). Timestamps are ISO strings. Ids are rand
 | `clients` | `name, email, phone, segment (LANDLORD, ESTATE_AGENT, PROPERTY_MANAGER_DEVELOPER, HOUSING_ASSOCIATION), orgName, billing{…}, onboarding{status, step}, consent, prefs, ownerUid` |
 | `properties` | `clientId, label, address, postcode, type, bedrooms, bathrooms, furnishing, access{…}, active` |
 | `pros` | `name, firstName, email, phone, home, bizType, bizName, skills[], coverage[], availability{days[], slots[]}, docs[{type, fileId, name, expires}], payout{holder, last4, ready}, status (INVITED, DRAFT, PENDING, RESUBMIT, APPROVED, SUSPENDED, REJECTED), level 1–5, levelHistory[], trainings{trainingId: {at}}, invite{hash, sentAt, expiresAt, acceptedAt, cancelledAt}, emailVerifiedAt, onboarding, review, ownerUid` |
-| `jobs` | `ref (LJ-1001), clientId, propertyId, propSnapshot, district, type (CHECK_IN, CHECK_OUT, MAINTENANCE), kind (REPAIRS_DAMAGES, CLEANING), scope{…}, window{date, slot}, status, quotes[], payments[], refunds[], offers[], proId, agreedFeeP, attendance{…}, reportDraft, reports[], disputes[], changeOrders[], settlement{…}, rating, info[], history[], baselineId, createdByAdmin` |
+| `jobs` | `ref (LJ-1001), clientId, propertyId, propSnapshot, district, type (INVENTORY, CHECK_IN, MID_TERM, CHECK_OUT, MAINTENANCE), kind (REPAIRS_DAMAGES, CLEANING), groupId (services booked together), scope{…}, window{date, slot}, status, quotes[], payments[], refunds[], offers[], proId, agreedFeeP, attendance{…}, reportDraft, reports[], disputes[], changeOrders[], settlement{…}, rating, info[], history[], baselineId, createdByAdmin` |
 | `evidence` | `jobId, stage (BEFORE, AFTER, ATTEND), area, item, type (image, pdf), assetId or dataUrl, by, at`. Pro verification documents are also stored here (`category: verification`). |
 | `messages` | `jobId, by (role), author, body, at` |
 | `notes` | Notifications: `to ('c:<id>', 'p:<id>', 'admin'), text, jobId, read, at` |
@@ -92,7 +92,39 @@ What's inside a job:
 | Dispute | `{id, by, category, text, status, outcome, refundP}` |
 | Change order | `{id, desc, estimateP, totalP, proFeeP, status}` |
 
-## 4. Request lifecycle
+## 4. Services and booking
+
+| Service | Stored as | Report | Compared with | Sign-off |
+|---|---|---|---|---|
+| Inventory | `type: INVENTORY` | LISTD Inventory format | — | — |
+| Check-In | `type: CHECK_IN` | LISTD Inventory format, starting from the latest inventory | — | Tenant walk-through sign-off |
+| Mid-Term | `type: MID_TERM` | LISTD Inventory format | Latest released check-in or inventory | — |
+| Check-Out | `type: CHECK_OUT` | LISTD Inventory format | Latest released check-in or inventory | Tenant walk-through sign-off |
+| Repairs & Damages | `type: MAINTENANCE, kind: REPAIRS_DAMAGES` | Diagnosis, work, before/after photos | — | — |
+| Cleaning | `type: MAINTENANCE, kind: CLEANING` | Checklist, before/after photos | — | — |
+
+A client can pick several services in one booking. `cmdSubmitMany` creates one request per service, sharing a `groupId`, and each request keeps only its own details. Each service has its own quote (an invoice for repairs), payment, Pro and report. Photos added in the booking go with the repair request, or with the first request if there is no repair. All inspections need a Level 4 Pro with the matching skill, or Level 5 for 4+ bedrooms.
+
+## 4c. Pricing engine (`src/pricing.js`)
+
+Money is in pence. `pricing()` merges `settings.pricing` over `DEFAULT_PRICING`; the Main admin edits it on Admin › Pricing.
+
+| Function | Does |
+|---|---|
+| `priceInspection(k, prop, {combo, sched})` | Rate-card line by size, same-visit saving, one furnishing line, extra rooms, outbuildings/outdoor, Flex or Priority line. Returns `custom` for 5+ beds, heavy furnishing or unusual floor area |
+| `priceCleaning(prop, scope, {sched})` | Cleaner-hours from type, size, bathrooms, condition and add-ons; minimum booking; estimate range |
+| `priceDiagnosis()` / `repairProFee(lines)` | £50 diagnosis visit; Pro fee = labour share + materials at cost |
+| `quoteFor(j)` | The quote for any job; prefills the Admin quote builder |
+| `cmdAutoQuote(j)` | Issues the fixed quote at submission for inspections and diagnosis visits |
+| `feeFromBase(proBase, level)` | Pro fee = attendance + minutes × level hourly rate + allowances |
+| `contribution(revP, proP)` | Contribution after Pro fee, payment, ops and rework costs, against the floor |
+| `portfolio(clientId, month)` / `portfolioLine` | Monthly tier, eligible fees, rebate due (capped at the floor); negotiated rate line |
+| `schedWindowOk`, `addWorkDays`, `workDaysUntil` | Flex / Standard / Priority date rules in working days |
+| `pilotStats()` / `vAdminPricing()` | Pilot measures and the editable rate card |
+
+Quote lines carry a `tag` (`svc`, `urgency`, `sched`, `materials`, `credit`, `portfolio`) so rebates exclude urgency and materials. Scope fields added: `sched`, `flexDates`, `sameVisit`, `addons`, `carpetRooms`, `areaM2`, `frequency`, `facilities`, `repairMode`. Property fields added: `kitchens`, `receptions`, `area`, `outbuildings`, `outdoor`, and furnishing `heavy`.
+
+## 4b. Request lifecycle
 
 ```
 SUBMITTED ─▶ NEEDS_INFORMATION ─▶ SUBMITTED
@@ -148,8 +180,7 @@ Clients and Pros only ever see their own records in the interface. In the artifa
 |---|---|
 | Passwords | PBKDF2-SHA256 with 150,000 iterations and a random salt, hashed in the browser. Passwords are never stored in plain text. |
 | Sessions | In browser storage, with a `sessionVersion` that changes on a reset or password change. Clients and Pros: 12 hours, or 30 days with "keep me signed in". Admins: 8 hours. |
-| Admin sign-in | TOTP is always on for admins (RFC 6238, with a QR code from qrcode-generator 1.4.4). |
-| Client and Pro two-factor | Optional, turned on or off in Settings. |
+| Two-factor (all roles) | Off by default. Turning it on in Settings › Sign-in & security shows a QR code (qrcode-generator 1.4.4) and setup key, and the user confirms it with a 6-digit TOTP code (RFC 6238). Turning it off needs the password. |
 | Pro sign-up | Email and password only. The name is collected in onboarding. |
 | Pro invitations | One-time 8-character code, stored only as a SHA-256 hash, valid for 7 days. The link is `#invite=CODE`. |
 
@@ -158,7 +189,7 @@ Clients and Pros only ever see their own records in the interface. In the artifa
 The domain logic carries over as it is: the state machine and guards in `actions.js`, levels, permissions, the quote and invoice maths, and the report format. The infrastructure needs replacing:
 
 1. **API and database.** Move to Postgres with a server API. Enforce every `cmd*` guard on the server, inside transactions, so offer acceptance and payouts are atomic. Apply tenant and role policies there, using the permission map in section 6.
-2. **Auth.** Use a managed identity provider with email verification and reset links sent by email. Use server-side sessions, and require MFA for staff. Staff invitations, roles and Pro invitations then become server records.
+2. **Auth.** Use a managed identity provider with email verification and reset links sent by email. Use server-side sessions, and consider requiring MFA for staff (it is optional in the MVP, by product decision). Staff invitations, roles and Pro invitations then become server records.
 3. **Payments.** Use a payments marketplace provider (for example Stripe Connect) for checkout, refunds and Pro payouts, driven by webhooks. Keep the idempotency keys the MVP already uses (`op`).
 4. **Files.** Use private object storage with signed URLs and malware scanning. Keep verification documents in a separate, restricted bucket.
 5. **Background worker.** Run offer and quote expiry, the 48-hour auto-complete and reminders on a schedule. In the MVP these run when someone opens the app (`sweep`).

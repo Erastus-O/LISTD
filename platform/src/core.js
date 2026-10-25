@@ -30,23 +30,37 @@ var SEGMENTS = {
   HOUSING_ASSOCIATION: { label: 'Housing association', icon: 'escrow', d: 'Maintain homes and trace service outcomes.' }
 };
 var SKILLS = {
-  CHECK_IN: { label: 'Check-in inspections', icon: 'check-in' }, CHECK_OUT: { label: 'Check-out inspections', icon: 'check-out' },
+  INVENTORY: { label: 'Inventory inspections', icon: 'inventory' }, CHECK_IN: { label: 'Check-ins (walk-through & sign-off)', icon: 'check-in' },
+  MID_TERM: { label: 'Mid-term inspections', icon: 'inspection' }, CHECK_OUT: { label: 'Check-outs (end of tenancy & sign-off)', icon: 'check-out' },
   REPAIRS_DAMAGES: { label: 'Repairs & damages', icon: 'settings' }, CLEANING: { label: 'Cleaning', icon: 'cleaning' }
 };
-var TYPES = { CHECK_IN: 'Check-In', CHECK_OUT: 'Check-Out', MAINTENANCE: 'Repairs & Cleaning' };
+var TYPES = { INVENTORY: 'Inventory', CHECK_IN: 'Check-In', MID_TERM: 'Mid-Term', CHECK_OUT: 'Check-Out', MAINTENANCE: 'Repairs & Cleaning' };
 var KINDS = { REPAIRS_DAMAGES: 'Repairs & Damages', CLEANING: 'Cleaning' };
+/* the six services, in the order clients see them */
 var SVC = {
-  CHECK_IN: { label: 'Check-In', icon: 'check-in', c: 'var(--service-checkin)', t: 'var(--service-checkin-subtle)', tx: 'var(--service-checkin-text)', d: 'Condition and inventory inspection at the start of an occupancy.' },
-  CHECK_OUT: { label: 'Check-Out', icon: 'check-out', c: 'var(--service-checkout)', t: 'var(--service-checkout-subtle)', tx: 'var(--service-checkout-text)', d: 'End-of-occupancy inspection, compared with the check-in where one exists.' },
-  REPAIRS_DAMAGES: { label: 'Repairs & Damages', icon: 'settings', c: 'var(--service-midterm)', t: 'var(--service-midterm-subtle)', tx: 'var(--service-midterm-text)', d: 'Describe the damage. LISTD prices it from the damage assessed and sends you an invoice.' },
-  CLEANING: { label: 'Cleaning', icon: 'cleaning', c: 'var(--service-cleaning)', t: 'var(--service-cleaning-subtle)', tx: 'var(--service-cleaning-text)', d: 'Light, General or Deep clean, priced by property size.' }
+  INVENTORY: { label: 'Inventory', icon: 'inventory', c: 'var(--service-inventory)', t: 'var(--service-inventory-subtle)', tx: 'var(--service-inventory-text)', d: 'Inspection and full schedule of condition of the property and its contents.' },
+  CHECK_IN: { label: 'Check-In', icon: 'check-in', c: 'var(--service-checkin)', t: 'var(--service-checkin-subtle)', tx: 'var(--service-checkin-text)', d: 'Tenant walk-through at the start of the tenancy, with sign-off.' },
+  MID_TERM: { label: 'Mid-Term', icon: 'inspection', c: 'var(--service-midterm)', t: 'var(--service-midterm-subtle)', tx: 'var(--service-midterm-text)', d: 'Condition inspection during the tenancy.' },
+  CHECK_OUT: { label: 'Check-Out', icon: 'check-out', c: 'var(--service-checkout)', t: 'var(--service-checkout-subtle)', tx: 'var(--service-checkout-text)', d: 'End-of-tenancy property condition, compared with the earlier report, with sign-off.' },
+  REPAIRS_DAMAGES: { label: 'Repairs & Damages', icon: 'settings', c: 'var(--service-repairs)', t: 'var(--service-repairs-subtle)', tx: 'var(--service-repairs-text)', d: 'A fixed task price where the job is clear, or a paid diagnostic visit where it isn’t.' },
+  CLEANING: { label: 'Cleaning', icon: 'cleaning', c: 'var(--service-cleaning)', t: 'var(--service-cleaning-subtle)', tx: 'var(--service-cleaning-text)', d: 'Standard, Deep, End of Tenancy or Office cleaning. An estimate now, a fixed quote before you pay.' }
 };
+var INSPECTIONS = ['INVENTORY', 'CHECK_IN', 'MID_TERM', 'CHECK_OUT'];
+function isInspK(k) { return INSPECTIONS.indexOf(k) >= 0; }
+function comparesK(k) { return k === 'CHECK_OUT' || k === 'MID_TERM'; }
+function signoffK(k) { return k === 'CHECK_IN' || k === 'CHECK_OUT'; }
+function svcType(k) { return k === 'REPAIRS_DAMAGES' || k === 'CLEANING' ? 'MAINTENANCE' : k; }
+function baseLabel(j) { var b = j && j.baselineId && D.jobs[j.baselineId]; return b ? SVC[svcKey(b)].label.toLowerCase() + ' ' + b.ref : ''; }
 function svcKey(j) { return j.type === 'MAINTENANCE' ? j.kind : j.type; }
 var CLEANS = {
-  light: { label: 'Light Clean', d: 'A quick refresh where the property has been left in reasonable order.', list: ['Wipe all surfaces and sills', 'Vacuum and mop all floors', 'Empty and clean bins', 'Clean WCs, basins and taps', 'Wipe kitchen worktops and sink'] },
-  general: { label: 'General Clean', d: 'A thorough clean throughout the property.', list: ['Kitchen units inside and out', 'Oven and hob cleaned', 'Fridge and freezer cleaned', 'Bathrooms fully cleaned', 'All floors vacuumed and mopped', 'Windows cleaned inside', 'Soft furnishings vacuumed', 'Bins emptied and cleaned'] },
-  deep: { label: 'Deep Clean', d: 'A full deep clean of every area, including behind furniture.', list: ['Move furniture and clean behind and under', 'Descale bathrooms, showers and taps', 'Appliances cleaned inside and out', 'Oven fully degreased', 'Skirting boards, doors and frames wiped', 'Windows and frames inside', 'Light fittings and switches cleaned', 'Kitchen units inside and out', 'All floors deep cleaned', 'Detailed finishing throughout'] }
+  standard: { label: 'Standard Home Cleaning', d: 'A stated checklist for a lived-in or tidy home. Minimum booking applies.', incl: 'Kitchen worktops, hob and sink, bathrooms, floors, dusting and bins. Oven, fridge, inside cupboards, windows and carpets are add-ons.', list: ['Dust all reachable surfaces and sills', 'Clean kitchen worktops, hob exterior and sink', 'Clean bathrooms: WC, basin, bath or shower, taps', 'Vacuum and mop all floors', 'Empty and clean bins', 'Wipe light switches and door handles'] },
+  deep: { label: 'Deep Cleaning', d: 'A fixed-scope deep clean priced on size, condition and labour.', incl: 'Everything in a standard clean, plus oven, fridge and freezer, inside cupboards, interior windows, skirting and behind furniture. Carpets are an add-on.', list: ['Move furniture and clean behind and under', 'Descale bathrooms, showers and taps', 'Oven fully degreased', 'Fridge and freezer cleaned inside', 'Inside kitchen cupboards and drawers', 'Skirting boards, doors and frames wiped', 'Interior windows and frames', 'Light fittings and switches cleaned', 'All floors deep cleaned'] },
+  eot: { label: 'End of Tenancy Cleaning', d: 'A fixed quote after the condition and appliances are assessed, to a check-out standard.', incl: 'Oven, fridge and freezer, inside cupboards, interior windows, bathrooms descaled and all floors. Carpets and exterior windows are add-ons.', list: ['Kitchen units inside and out', 'Oven, hob and extractor degreased', 'Fridge and freezer cleaned and left open', 'Bathrooms descaled and sanitised', 'Interior windows, frames and sills', 'Skirting, doors and frames', 'All floors vacuumed and mopped', 'Bins emptied and cleaned', 'Remove marks from walls where possible'] },
+  office: { label: 'Office Cleaning', d: 'Quoted from floor area, facilities, access and frequency.', incl: 'Desks and surfaces, kitchens, washrooms, floors and bins. Carpets and exterior windows are add-ons.', list: ['Desks and work surfaces wiped', 'Kitchen and break areas cleaned', 'Washrooms cleaned and restocked', 'Floors vacuumed and mopped', 'Bins emptied', 'Touch points sanitised'] }
 };
+/* requests made before the pilot used Light and General cleans */
+Object.defineProperty(CLEANS, 'light', { value: CLEANS.standard, enumerable: false });
+Object.defineProperty(CLEANS, 'general', { value: CLEANS.standard, enumerable: false });
 var SEVERITY = { low: 'Low: cosmetic or minor', medium: 'Medium: affects use', high: 'High: needs prompt attention', unsafe: 'Unsafe / emergency' };
 var COND = { excellent: ['Excellent', 'var(--success-fill)', 'var(--success-subtle)', 4], good: ['Good', 'var(--info-fill)', 'var(--info-subtle)', 3], fair: ['Fair', 'var(--warning-fill)', 'var(--warning-subtle)', 2], poor: ['Poor', 'var(--danger-fill)', 'var(--danger-subtle)', 1], na: ['Not inspected', 'var(--border-strong)', 'var(--surface-sunken)', 0] };
 var FIND = { none: 'No change', new: 'New damage', existing: 'Existing', uncertain: 'Uncertain' };
@@ -64,8 +78,8 @@ var OPEN_STATES = ['SUBMITTED', 'NEEDS_INFORMATION', 'QUOTED', 'AWAITING_PAYMENT
 var STARTED = ['IN_PROGRESS', 'ADMIN_REVIEW', 'CORRECTION_REQUIRED', 'CLIENT_REVIEW', 'COMPLETED'];
 /* Pro levels. Levels 1-3 are cleaning; Levels 4-5 add inspections and pay more. Repairs & Damages is a trade skill approved separately, outside the levels. */
 var LEVEL_INFO = [null,
-  { name: 'Cleaner', unlocks: 'Light cleans' },
-  { name: 'Experienced cleaner', unlocks: 'Light and General cleans' },
+  { name: 'Cleaner', unlocks: 'Standard home cleans' },
+  { name: 'Experienced cleaner', unlocks: 'Standard, End of Tenancy and Office cleans' },
   { name: 'Senior cleaner', unlocks: 'All cleans, including Deep cleans' },
   { name: 'Inspector', unlocks: 'Check-in and check-out inspections (up to 3 bedrooms), plus all cleans' },
   { name: 'Senior inspector', unlocks: 'Inspections on every property size, including 4+ bedrooms, plus all cleans' }];
@@ -76,17 +90,11 @@ var DEFAULT_SETTINGS = {
   quoteValidityDays: 7, offerValidityHours: 12, reviewHours: 48, rescheduleHours: 24, proFeePct: 75,
   levels: [{ minJobs: 0, minRating: 0, sharePct: 60 }, { minJobs: 5, minRating: 4.0, sharePct: 65 }, { minJobs: 15, minRating: 4.3, sharePct: 70 }, { minJobs: 25, minRating: 4.5, sharePct: 75 }, { minJobs: 40, minRating: 4.7, sharePct: 80 }],
   repairCategories: ['Plumbing', 'Electrical', 'Appliances', 'Fixtures & decor', 'Other'],
-  guide: { CHECK_IN: { base: 5500, bed: 1000 }, CHECK_OUT: { base: 5500, bed: 1000 }, light: { base: 6000, bed: 1500, bath: 1000 }, general: { base: 9000, bed: 2500, bath: 1500 }, deep: { base: 14000, bed: 4000, bath: 2500 } }
+  guide: { INVENTORY: { base: 9000, bed: 1500 }, CHECK_IN: { base: 5500, bed: 1000 }, MID_TERM: { base: 5000, bed: 800 }, CHECK_OUT: { base: 5500, bed: 1000 }, light: { base: 6000, bed: 1500, bath: 1000 }, general: { base: 9000, bed: 2500, bath: 1500 }, deep: { base: 14000, bed: 4000, bath: 2500 } }
 };
 function settings() { var s = D.settings || {}, d = DEFAULT_SETTINGS, o = {}; Object.keys(d).forEach(function (k) { o[k] = s[k] != null ? s[k] : d[k]; }); o.guide = Object.assign({}, d.guide, s.guide || {}); return o; }
-/* price guide used by Admin to prefill quote lines — not shown to clients as a price */
-function guideLines(j) {
-  var p = D.properties[j.propertyId] || {}, g = settings().guide, beds = Math.max(0, (+p.bedrooms || 1) - 1), baths = Math.max(0, (+p.bathrooms || 1) - 1), L = [];
-  if (j.type === 'CHECK_IN' || j.type === 'CHECK_OUT') { L.push({ d: TYPES[j.type] + ' inspection and report', q: 1, u: g[j.type].base }); if (beds) L.push({ d: 'Additional bedroom', q: beds, u: g[j.type].bed }); }
-  else if (j.kind === 'CLEANING') { var c = g[j.scope.clean] || g.general; L.push({ d: CLEANS[j.scope.clean].label, q: 1, u: c.base }); if (beds) L.push({ d: 'Additional bedroom', q: beds, u: c.bed }); if (baths) L.push({ d: 'Additional bathroom', q: baths, u: c.bath }); }
-  else L.push({ d: 'Labour: ' + (j.scope.category || 'repair'), q: 1, u: 0 }, { d: 'Materials', q: 1, u: 0 });
-  return L;
-}
+/* the Admin quote builder prefills from the pricing engine (pricing.js) */
+function guideLines(j) { return quoteFor(j).lines; }
 function quoteTotal(q) { var sub = q.lines.reduce(function (a, l) { return a + Math.round(l.q * l.u); }, 0); return { sub: sub, total: Math.max(0, sub + (q.taxP || 0) - (q.discP || 0)) }; }
 function curQuote(j) { return (j.quotes || []).filter(function (q) { return q.status === 'ISSUED' || q.status === 'ACCEPTED'; }).slice(-1)[0] || null; }
 function acceptedQuote(j) { return (j.quotes || []).filter(function (q) { return q.status === 'ACCEPTED'; }).slice(-1)[0] || null; }
@@ -133,12 +141,14 @@ function inspectionTemplate(prop, j) {
 }
 function newReport(j) {
   var k = svcKey(j), prop = D.properties[j.propertyId] || {};
-  if (k === 'CHECK_IN' || k === 'CHECK_OUT') return inspTemplate(prop, j);
-  if (k === 'CLEANING') return { checklist: CLEANS[j.scope.clean || 'general'].list.map(function (t) { return { t: t, done: false, na: '' }; }), exclusions: '', issues: '', summary: '' };
+  if (isInspK(k)) return inspTemplate(prop, j);
+  if (k === 'CLEANING') return { checklist: (CLEANS[j.scope.clean] || CLEANS.standard).list.map(function (t) { return { t: t, done: false, na: '' }; }), exclusions: '', issues: '', summary: '' };
   return { diagnosis: '', work: '', materials: '', tests: '', unresolved: '', summary: '' };
 }
-function findBaseline(propertyId, beforeIso) {
-  return list('jobs').filter(function (j) { return j.propertyId === propertyId && j.type === 'CHECK_IN' && releasedReport(j) && (!beforeIso || j.createdAt < beforeIso); }).sort(byNew)[0] || null;
+/* the earlier released report an inspection is compared with: check-out and mid-term use the latest check-in or inventory; check-in uses the latest inventory */
+function findBaseline(propertyId, beforeIso, forType) {
+  var ok = forType === 'CHECK_IN' ? ['INVENTORY'] : ['CHECK_IN', 'INVENTORY'];
+  return list('jobs').filter(function (j) { return j.propertyId === propertyId && ok.indexOf(j.type) >= 0 && releasedReport(j) && (!beforeIso || j.createdAt < beforeIso); }).sort(byNew)[0] || null;
 }
 
 /* ---------- store ---------- */

@@ -33,7 +33,7 @@ with sync_playwright() as pw:
     def admin_setup():
         opt(p, '#au-name', 'Ops Admin'); p.fill('#au-email', 'ops@listd.test'); p.fill('#au-password', 'Admin2026!'); opt(p, '#au-confirm', 'Admin2026!')
         p.click('form[data-form=auth-admin-setup] button[type=submit]'); p.wait_for_timeout(1200)
-        p.fill('#au-code', p.evaluate("() => totp(S.auth.secret)")); p.click('form[data-form=auth-mfa-setup] button[type=submit]'); p.wait_for_timeout(900)
+        p.wait_for_timeout(900)
     try:
         p.goto(APP); W(500); shot(p,'00-signin')
         # ---- client onboarding
@@ -43,7 +43,7 @@ with sync_playwright() as pw:
         p.fill('#p-lbl','Pulteney Flat 3'); p.fill('#p-addr','Flat 3, 22 Pulteney Street, Bath'); p.fill('#p-pc','ba2 4ds'); p.fill('#p-bed','2'); p.select_option('#p-furn','furnished'); p.fill('#p-acode','Key safe 4821'); p.fill('#p-cn','Jo Tenant'); p.fill('#p-cp','07700 900001'); shot(p,'02-ob-prop'); btn('Save property')
         shot(p,'03-ob-review'); btn('Finish setup'); log('client onboarded')
         # ---- check-in request
-        nav('jobs'); p.locator('.a-main [data-go=new]').first.click(); W(); submit(); p.click('label.a-opt:has(input[value=CHECK_IN])'); submit(); p.fill('#w-keys','2 sets to tenant'); submit(); submit(); p.fill('#w-date',D1); submit(); shot(p,'04-wiz-review'); submit(); log('check-in submitted '+str(state('LJ-1001')))
+        nav('jobs'); p.locator('.a-main [data-go=new]').first.click(); W(); submit(); p.click('label.a-opt:has(input[value=CHECK_IN])'); submit(); opt(p, '#w-occ', 'Jo Tenant'); p.fill('#w-keys','2 sets to tenant'); submit(); submit(); p.fill('#w-date',D1); submit(); shot(p,'04-wiz-review'); submit(); log('check-in submitted '+str(state('LJ-1001')))
         # ---- admin quote
         role('admin'); admin_setup(); shot(p,'05-admin-home'); openref('LJ-1001'); shot(p,'06-quote-builder'); btn('Issue quote to client'); log('quoted '+str(state('LJ-1001')))
         role('client'); openref('LJ-1001'); shot(p,'07-client-quote'); btn('Accept quote'); btn('Simulate a failed payment'); log('failed pay '+str(state('LJ-1001'))); p.locator('[data-act=pay]').click(); W(); log('paid '+str(state('LJ-1001'))); p.locator('[data-act=pay]').count()==0 or log('PAY BUTTON STILL THERE')
@@ -67,7 +67,7 @@ with sync_playwright() as pw:
         p.evaluate("""() => { var j=Object.values(D.jobs).find(x=>x.ref==='LJ-1001'), d=draftOf(j);
           d.schedule.forEach(function(r,i){ if(i>0) r.value = SCHED_OPTS[r.kind][r.kind==='clean'?1:r.kind==='ext'?0:2]; });
           d.rooms.forEach(function(rm){ rm.items.forEach(function(it){ it.desc = 'White painted ' + it.name.toLowerCase() + '.'; }); });
-          d.meters.forEach(function(m){ m.na = true; }); d.keys[0].desc = 'Two sets of tenant keys.'; saveDraft(j.id); render(); }""")
+          d.meters.forEach(function(m){ m.na = true; }); d.keys[0].desc = 'Two sets of tenant keys.'; d.signoff = { name: 'Jo Tenant', status: 'signed', note: '' }; saveDraft(j.id); render(); }""")
         W(900)
         up('input[data-up*="clock-out"]'); p.locator('form[data-form=clock-out] button[type=submit]').click(); W(); shot(p,'13-pro-report'); btn('Submit report'); log('report submitted '+str(state('LJ-1001')))
         role('admin'); nav('reviews'); p.locator('.a-main tr.click').first.click(); W(); shot(p,'14-admin-review'); p.fill('form[data-form=return] input','Add a note on the hallway scuff'); p.locator('form[data-form=return] button').click(); W(); log('returned '+str(state('LJ-1001')))
@@ -78,7 +78,7 @@ with sync_playwright() as pw:
         role('client'); openref('LJ-1001'); btn('Accept report'); p.click('[data-act=star][data-n="5"]'); p.locator('form[data-form=rate] button[type=submit]').click(); W(); shot(p,'16-client-complete'); log('completed '+str(state('LJ-1001')))
         role('admin'); nav('finance'); shot(p,'17-finance'); p.locator('[data-act=payout]').first.click(); W(); log('payout '+str(state('LJ-1001')))
         # ---- check-out with baseline
-        role('client'); nav('jobs'); p.locator('.a-main [data-go=new]').first.click(); W(); submit(); p.click('label.a-opt:has(input[value=CHECK_OUT])'); submit(); shot(p,'18-checkout-baseline'); base_ok=p.locator('text=Baseline found').count(); p.fill('#w-keys','Collect 2 sets'); submit(); submit(); p.fill('#w-date',D2); submit(); submit(); log('check-out submitted, baseline banner=%d'%base_ok)
+        role('client'); nav('jobs'); p.locator('.a-main [data-go=new]').first.click(); W(); submit(); p.click('label.a-opt:has(input[value=CHECK_OUT])'); submit(); shot(p,'18-checkout-baseline'); base_ok=p.locator('text=Baseline found').count(); opt(p, '#w-occ', 'Jo Tenant'); p.fill('#w-keys','Collect 2 sets'); submit(); submit(); p.fill('#w-date',D2); submit(); submit(); log('check-out submitted, baseline banner=%d'%base_ok)
         # ---- repairs with change order + dispute
         nav('jobs'); p.locator('.a-main [data-go=new]').first.click(); W(); submit(); p.click('label.a-opt:has(input[value=REPAIRS_DAMAGES])'); shot(p,'18a-wiz-service'); submit(); p.fill('#w-loc','Kitchen sink'); p.fill('#w-desc','Tap drips constantly'); submit(); up('input[data-up]'); submit(); p.fill('#w-date',D2); submit(); submit(); log('repair submitted '+str(state('LJ-1003')))
         role('admin'); openref('LJ-1003'); p.fill('input[name=l_u_0]','60'); p.fill('input[name=l_u_1]','15'); btn('Recalculate'); p.fill('#q-fee','55'); btn('Issue invoice to client')

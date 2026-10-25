@@ -17,8 +17,7 @@ function topBar() {
   var roles = [['client', 'home', 'Client'], ['pro', 'verified-pro', 'Pro']]; if (ENV.canAdmin) roles.push(['admin', 'settings', 'Admin']);
   var who = S.role === 'client' && me() ? (me().orgName || me().name) : S.role === 'pro' && meP() ? (meP().name || meP().email) : S.role === 'admin' && S.adminOk ? ((myStaff() || {}).name || 'LISTD admin') : '';
   var unread = ENV.mode === 'connecting' || (S.role !== 'admin' && !who) ? 0 : myInbox().filter(function (n) { return !n.read; }).length;
-  return '<header class="a-top"><div class="in">' + (window.LISTD_SITE ? '<a class="ld-logo" href="' + esc(window.LISTD_SITE) + '" aria-label="listd home" style="text-decoration:none">listd</a>' : '<span class="ld-logo" aria-label="listd">listd</span>') + '<span class="tag">' + ({ admin: 'Admin', pro: 'Pro', client: 'Client' })[S.role] + '</span>' + (PORTAL ? '<span style="margin-left:auto"></span>' : '<div class="a-roles" role="group" aria-label="Portal">' + roles.map(function (r) { return '<button type="button" data-act="role" data-r="' + r[0] + '" aria-pressed="' + (S.role === r[0]) + '">' + ic(r[1], 16) + '<span>' + r[2] + '</span></button>'; }).join('') + '</div>') + (who ? (S.role === 'admin' && !staffRole() ? '' : '<button type="button" class="a-bell" id="a-bell" data-act="notif" aria-haspopup="dialog" aria-controls="notif-panel" aria-expanded="' + !!S.notif + '" aria-label="Notifications' + (unread ? ', ' + unread + ' unread' : '') + '">' + ic('bell', 20) + (unread ? '<span>' + unread + '</span>' : '') + '</button><button type="button" class="a-who" data-go="settings" title="Settings">' + esc(who) + '</button>') + '<button type="button" class="ld-btn ld-btn-ghost ld-btn-sm a-signout" data-act="signout">Sign out</button>' : '') + '</div></header>' +
-    '<div class="a-mode" role="note">' + (ENV.mode === 'connecting' ? 'Connecting…' : 'Test mode: payments, refunds and payouts are simulated. No real money moves.' + (ENV.mode === 'local' ? ' Data is saved in this browser only.' : '')) + '</div>';
+  return '<header class="a-top"><div class="in">' + (window.LISTD_SITE ? '<a class="ld-logo" href="' + esc(window.LISTD_SITE) + '" aria-label="listd home" style="text-decoration:none">listd</a>' : '<span class="ld-logo" aria-label="listd">listd</span>') + '<span class="tag">' + ({ admin: 'Admin', pro: 'Pro', client: 'Client' })[S.role] + '</span>' + (PORTAL ? '<span style="margin-left:auto"></span>' : '<div class="a-roles" role="group" aria-label="Portal">' + roles.map(function (r) { return '<button type="button" data-act="role" data-r="' + r[0] + '" aria-pressed="' + (S.role === r[0]) + '">' + ic(r[1], 16) + '<span>' + r[2] + '</span></button>'; }).join('') + '</div>') + (who ? (S.role === 'admin' && !staffRole() ? '' : '<button type="button" class="a-bell" id="a-bell" data-act="notif" aria-haspopup="dialog" aria-controls="notif-panel" aria-expanded="' + !!S.notif + '" aria-label="Notifications' + (unread ? ', ' + unread + ' unread' : '') + '">' + ic('bell', 20) + (unread ? '<span>' + unread + '</span>' : '') + '</button><button type="button" class="a-who" data-go="settings" title="Settings">' + esc(who) + '</button>') + '<button type="button" class="ld-btn ld-btn-ghost ld-btn-sm a-signout" data-act="signout">Sign out</button>' : '') + '</div></header>';
 }
 function signedIn() { return S.role === 'admin' ? ENV.canAdmin && S.adminOk : S.role === 'pro' ? !!meP() : !!me(); }
 function onboarded() { return S.role === 'admin' || (S.role === 'pro' ? proOnboarded() : clientOnboarded()); }
@@ -70,7 +69,7 @@ function mainView() {
     if (!ENV.canAdmin) return '<div class="a-page">' + empty('lock', 'Admin access only', 'The admin panel is for LISTD staff with edit access to this workspace.', '') + '</div>';
     if (!S.adminOk) return vAuth();
     ensureStaff(); if (!staffRole()) return vStaffBlocked(); if (!viewAllowed(v)) return vNoAccess();
-    return ({ job: vJob, requests: vAdminRequests, assign: vAdminAssign, reviews: vAdminReviews, disputes: vAdminDisputes, invoicing: vAdminInvoicing, finance: vAdminFinance, pros: vAdminPros, pro: vAdminPro, training: function () { return S.params.id ? vTraining() : vAdminTraining(); }, clients: vAdminClients, properties: vAdminProps, property: vProperty, policies: vAdminPolicies, audit: vAdminAudit, inbox: vInbox, settings: vSettings }[v] || vAdminHome)();
+    return ({ job: vJob, requests: vAdminRequests, assign: vAdminAssign, reviews: vAdminReviews, disputes: vAdminDisputes, invoicing: vAdminInvoicing, finance: vAdminFinance, pricing: vAdminPricing, analytics: vAdminAnalytics, pros: vAdminPros, pro: vAdminPro, training: function () { return S.params.id ? vTraining() : vAdminTraining(); }, clients: vAdminClients, properties: vAdminProps, property: vProperty, policies: vAdminPolicies, audit: vAdminAudit, inbox: vInbox, settings: vSettings }[v] || vAdminHome)();
   }
   if (!AUTH.loaded) return vAuth();
   if (S.role === 'pro') { if (!meP()) return vAuth(); if (!proOnboarded()) return vProOnboard(); return ({ job: vJob, offers: vProOffers, schedule: vProSchedule, training: function () { return S.params.id ? vTraining() : vProTraining(); }, earnings: vProEarnings, account: vSettings, settings: vSettings, inbox: vInbox }[v] || vProHome)(); }
@@ -88,6 +87,7 @@ function modalView() {
     case 'training': inner = trainingModal(); break;
     case 'invoice': inner = invModal(); break;
     case 'invite': inner = inviteModal(); break;
+    case 'price-code': inner = priceCodeModal(); break;
     case 'staff': inner = staffModal(); break;
     case 'dispute': inner = mShell('m-dispute', j.status === 'COMPLETED' ? 'Raise a complaint' : 'Raise a dispute', '<p class="a-muted">' + (S.role === 'client' ? 'Payout to the Pro is frozen while LISTD reviews.' : 'LISTD will review and contact both parties.') + '</p>' + field('md-cat', 'Category', sel('md-cat', 'category', S.role === 'pro' ? ['Access or safety', 'Scope disagreement', 'Payment', 'Client conduct', 'Other'] : ['Quality of work', 'Report accuracy', 'Missed or late visit', 'Damage', 'Pro conduct', 'Other'], '')) + field('md-t', 'What happened?', area('md-t', 'text', '', 'required')) + photoGrid(evs) + '<div class="a-row">' + upBtn({ jobId: j.id, stage: 'OTHER', area: 'dispute', modal: 1 }, 'Add evidence') + '</div>', 'Open dispute', 'ld-btn-danger'); break;
     case 'resched': inner = mShell('m-resched', 'Request a new time', '<p class="a-muted">Current: ' + winLabel(j.window) + '. It stays booked until the client and Pro both agree' + (hoursFrom(winStart(j.window)) <= settings().rescheduleHours ? ', and LISTD reviews it because it’s short notice' : '') + '.</p><div class="two">' + field('mr-d', 'New date', inp('mr-d', 'date', '', 'type="date" required min="' + new Date().toISOString().slice(0, 10) + '"')) + field('mr-s', 'Window', sel('mr-s', 'slot', Object.keys(WINDOWS).map(function (k) { return [k, WINDOWS[k][0] + ' ' + WINDOWS[k][1] + '–' + WINDOWS[k][2]]; }), j.window.slot)) + '</div>' + field('mr-r', 'Reason', inp('mr-r', 'reason', '', 'required')), 'Send request'); break;
@@ -172,12 +172,19 @@ document.addEventListener('click', function (e) {
     case 't-status': cmdTrainingStatus(a.dataset.id, a.dataset.s) && toast({ PUBLISHED: 'Training published', DRAFT: 'Saved as draft', ARCHIVED: 'Training archived' }[a.dataset.s]); break;
     case 'app-withdraw': cmdWithdrawApp(id) && toast('Application withdrawn'); break;
     case 'cal-prev': case 'cal-next': case 'cal-today': case 'cal-go': (function () { var t = new Date(), cur = S.calM || (t.getFullYear() + '-' + ('0' + (t.getMonth() + 1)).slice(-2)), y = +cur.slice(0, 4), mo = +cur.slice(5, 7) - 1; if (act === 'cal-today') { S.calM = null; } else if (act === 'cal-go') { S.calM = a.dataset.m; } else { var d = new Date(y, mo + (act === 'cal-next' ? 1 : -1), 1); S.calM = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2); } render(); })(); break;
-    case 'close': if (S.modal && S.modal.type === 'training') S.tUp = null; S.modal = null; render(); break;
+    case 'close': if (S.modal && S.modal.type === 'training') S.tUp = null; if (S.modal && S.modal.type === 'price-code') { S.priceCode = null; S.smsOutbox = null; } S.modal = null; render(); break;
+    case 'seg-go': S.seg = Object.assign({}, S.seg); S.seg[a.dataset.k] = a.dataset.t; go(a.dataset.v); break;
+    case 'seg-tab': S.seg = Object.assign({}, S.seg, (function (o) { o[a.dataset.k] = a.dataset.t; return o; })({})); render(); break;
+    case 'fin-tab': S.finTab = a.dataset.t; render(); break;
+    case 'tr-tab': S.trTab = a.dataset.t; render(); break;
+    case 'pol-tab': S.polTab = a.dataset.t; render(); break;
+    case 'team-tab': S.teamTab = a.dataset.t; render(); break;
+    case 'price-resend': if (S.priceCode && Date.now() - S.priceCode.sentAt < CODE_RESEND_S * 1000) { toast('Wait ' + Math.ceil(CODE_RESEND_S - (Date.now() - S.priceCode.sentAt) / 1000) + ' seconds before asking for another code.'); break; } if (S.priceCode) sendPriceCode(S.priceCode.purpose, S.priceCode.phone, S.priceCode.payload).then(function (r) { r && toast('New code sent to ' + maskPhone(S.priceCode.phone)); }); break;
     case 't-new': S.tUp = null; S.modal = { type: 'training' }; render(); break;
     case 'pro-add': if (!staffGuard('pros', 'add Pros')) break; S.modal = { type: 'invite' }; render(); break;
     case 'staff-add': S.modal = { type: 'staff' }; render(); break;
     case 'staff-transfer': S.modal = { type: 'staff', kind: 'transfer', id: id }; render(); break;
-    case 'staff-remove': cmdStaffRemove(id) && toast('Access removed'); break;
+    case 'staff-remove': keyDecision('staff-remove', { id: id }); break;
     case 'inv-copy': (function () { var p = D.pros[S.modal.done.id], t = 'Hi ' + (p.firstName || p.name) + ', you’re invited to join LISTD as a Pro. Open ' + inviteLink(S.modal.done.code) + ', choose Pro, then Accept an invitation. Code: ' + S.modal.done.code + ' (use ' + p.email + '). Expires ' + fdate(p.invite.expiresAt) + '.'; (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { toast('Invitation copied'); }, function () { toast('Copy isn’t available here. Select the code and link instead.'); }); })(); break;
     case 'pro-resend': cmdResendInvite(id).then(function (r) { if (r) { S.modal = { type: 'invite', done: r }; render(); } }); break;
     case 'pro-uninvite': cmdCancelInvite(id) && toast('Invitation cancelled'); break;
@@ -207,6 +214,7 @@ document.addEventListener('click', function (e) {
     case 'inv-pay': if (cmdAcceptQuote(j) && cmdPay(D.jobs[j.id])) toast('Invoice paid (test)'); break;
     case 'q-reject': M('q-reject'); break;
     case 'pay': if (cmdPay(j)) toast('Payment confirmed (test)'); break;
+    case 'grp-pay': var gn = cmdGroupPay(j); if (gn) toast(gn + ' services paid together (test)'); break;
     case 'pay-fail': cmdPay(j, true); toast('Payment failed (simulated). Booking not confirmed.'); break;
     case 'r-accept': if (cmdAcceptReport(j, 'EXPLICIT')) toast('Report accepted'); break;
     case 'r-correct': M('r-correct'); break;
@@ -220,6 +228,7 @@ document.addEventListener('click', function (e) {
     case 'co-decline': cmdCOReply(j, a.dataset.co, false); break;
     case 'star': S.rate = S.rate || {}; S.rate[id] = +a.dataset.n; render(); break;
     case 'receipt': downloadReceipt(j); break;
+    case 'rebate': if (cmdRecordRebate(a.dataset.id, a.dataset.m, +a.dataset.p)) { toast('Rebate recorded (test mode)'); render(); } break;
     case 'dl-report': downloadReport(j); break;
     case 'rv': S.params = Object.assign({}, S.params, { rv: +a.dataset.v }); render(); break;
     /* pro */
@@ -268,10 +277,17 @@ document.addEventListener('change', async function (e) {
   var el = e.target;
   if (settingsChange(el)) return;
   if (el.dataset.filt && el.dataset.filt !== 'search') { S[el.dataset.filt] = el.value; render(); return; }
-  if (el.dataset.staffrole) { if (el.value) cmdStaffRole(el.dataset.staffrole, el.value) && toast('Role updated'); return; }
+  if (el.name === 'service' && el.type === 'checkbox') { var cnt = document.querySelectorAll('input[name=service]:checked').length, ce = document.getElementById('w-svc-count'); if (ce) ce.textContent = cnt ? cnt + ' selected' : 'Nothing selected yet'; return; }
+  if (el.dataset.staffrole) { if (el.value) { var sid = el.dataset.staffrole, srole = el.value; el.value = (D.staff[sid] || {}).role || ''; keyDecision('staff-role', { id: sid, role: srole }); } return; }
   if (el.id === 'inv-c') { S.modal.cid = el.value; S.modal.jid = ''; S.modal.pid = ''; render(); return; }
   if (el.id === 'inv-j') { S.modal.jid = el.value; render(); invCalc(document.querySelector('form[data-form=inv-create]')); return; }
-  if (el.id === 'of-pro') { var fe = document.getElementById('of-fee'), pr0 = D.pros[el.value]; if (fe && pr0 && +fe.dataset.sub) fe.value = (Math.round(+fe.dataset.sub * lvRule(proLevel(pr0)).sharePct / 100) / 100).toFixed(2); return; }
+  if (el.id === 'of-pro') { var fe = document.getElementById('of-fee'), pr0 = D.pros[el.value], jq = fe && D.jobs[fe.dataset.job], aq0 = jq && acceptedQuote(jq); if (fe && pr0 && aq0 && aq0.proBase) fe.value = (feeFromBase(aq0.proBase, proLevel(pr0)) / 100).toFixed(2); return; }
+  if (el.dataset.wizclean && S.wiz) { S.wiz.scope.clean = el.value; S.wiz.scope.addons = (S.wiz.scope.addons || []).filter(function (a) { return cleanIncl(el.value).indexOf(a) < 0; }); render(); return; }
+  if (S.wiz && ['w-bed', 'w-rec', 'w-frn', 'w-unf'].indexOf(el.id) >= 0) { var g = function (id) { var e = document.getElementById(id); return e ? Math.max(0, +e.value || 0) : 0; }, tot = g('w-bed') + 1 + g('w-rec'), fe = document.getElementById('w-frn'), ue = document.getElementById('w-unf'); if (fe && ue) { if (el.id === 'w-unf') fe.value = Math.max(0, tot - g('w-unf')); else ue.value = Math.max(0, tot - Math.min(tot, g('w-frn'))); if (el.id !== 'w-unf' && g('w-frn') > tot) fe.value = tot; var nt = document.getElementById('w-furn-note'); if (nt) nt.textContent = 'Count the bedrooms, living room and reception rooms: ' + tot + ' in total. ' + FURNISH[furnLevel(g('w-frn'), tot)] + '.'; } return; }
+  if (el.dataset.wizprop && S.wiz) { S.wiz.propertyId = el.value; S.wiz.rooms = null; render(); return; }
+  if (el.dataset.wizdate && S.wiz) { S.wiz.date = el.value; S.wiz.sched = schedForDate(el.value); render(); return; }
+  if (el.dataset.wizsched && S.wiz) { S.wiz.sched = el.value; render(); return; }
+  if (el.name === 'addons' && el.value === 'carpets' && S.wiz) { var ad = S.wiz.scope.addons || []; S.wiz.scope.addons = el.checked ? ad.concat(['carpets']) : ad.filter(function (a) { return a !== 'carpets'; }); render(); return; }
   if (el.dataset.rfsel) { var jr = D.jobs[el.dataset.id]; setPath(draftOf(jr), el.dataset.rfsel, el.value); saveDraft(jr.id); render(); return; }
   if (el.dataset.mna) { var jm = D.jobs[el.dataset.id]; draftOf(jm).meters[+el.dataset.mna].na = el.checked; saveDraft(jm.id); render(); return; }
   if (el.dataset.ck) { var j = D.jobs[el.dataset.id]; draftOf(j).checklist[+el.dataset.ck].done = el.checked; saveDraft(j.id); render(); return; }
@@ -325,12 +341,12 @@ document.addEventListener('submit', function (e) {
       break;
     case 'wiz':
       var w = S.wiz;
-      if (w.step === 1) w.propertyId = v('propertyId');
-      else if (w.step === 2) { var sv = v('service'); if (!SVC[sv]) { toast('Choose a service.'); return; } w.type = sv === 'REPAIRS_DAMAGES' || sv === 'CLEANING' ? 'MAINTENANCE' : sv; w.kind = w.type === 'MAINTENANCE' ? sv : null; }
-      else if (w.step === 3) { ['rooms', 'inventory', 'keys', 'occupant', 'clean', 'condition', 'notes', 'category', 'location', 'description', 'severity'].forEach(function (k) { if (fd.has(k)) w.scope[k] = v(k); }); if (w.scope.severity === 'unsafe') toast('Flagged as unsafe. LISTD will see this first.'); }
-      else if (w.step === 4) { w.scope.access = v('access'); if (fd.has('noPhotoReason')) w.scope.noPhotoReason = v('noPhotoReason'); if (w.kind === 'REPAIRS_DAMAGES' && !w.photoIds.length && !w.scope.noPhotoReason) { toast('Add a photo, or say why you can’t.'); return; } }
-      else if (w.step === 5) { w.date = v('date'); w.slot = v('slot'); }
-      else { var nid = cmdSubmit(w); if (nid) { S.wiz = null; go('job', { id: nid }); toast('Request submitted'); } return; }
+      if (w.step === 1) { w.propertyId = v('propertyId'); var rm = { pid: w.propertyId, save: fd.has('saveRooms') }; ['bedrooms', 'bathrooms', 'kitchens', 'receptions', 'furnishedRooms', 'unfurnishedRooms'].forEach(function (k) { rm[k] = Math.max(0, Math.min(20, Math.round(+v(k) || 0))); }); var tot = livingRooms(rm); if (rm.furnishedRooms + rm.unfurnishedRooms !== tot) { toast('Furnished and unfurnished rooms should add up to ' + tot + ' (bedrooms, living room and reception rooms).'); return; } rm.furnishing = furnLevel(rm.furnishedRooms, tot, fd.has('heavy')); w.rooms = rm; if (rm.save && D.properties[w.propertyId] && D.properties[w.propertyId].clientId === S.clientId) patchDoc('properties', w.propertyId, { bedrooms: rm.bedrooms, bathrooms: rm.bathrooms, kitchens: rm.kitchens, receptions: rm.receptions, furnishedRooms: rm.furnishedRooms, furnishing: rm.furnishing }); }
+      else if (w.step === 2) { var svs = fd.getAll('service').filter(function (k) { return SVC[k]; }); if (!svs.length) { toast('Choose at least one service.'); return; } w.services = SVC_ORDER.filter(function (k) { return svs.indexOf(k) >= 0; }); }
+      else if (w.step === 3) { ['rooms', 'contents', 'keys', 'occupant', 'tenantContact', 'clean', 'condition', 'notes', 'category', 'location', 'description', 'severity', 'repairMode', 'areaM2', 'frequency', 'facilities', 'carpetRooms'].forEach(function (k) { if (fd.has(k)) w.scope[k] = v(k); }); if (wizHas(w, 'CLEANING')) w.scope.addons = fd.getAll('addons'); if (w.scope.severity === 'unsafe') toast('Flagged as unsafe. LISTD will see this first.'); }
+      else if (w.step === 4) { w.scope.access = v('access'); if (fd.has('noPhotoReason')) w.scope.noPhotoReason = v('noPhotoReason'); if (wizHas(w, 'REPAIRS_DAMAGES') && !w.photoIds.length && !w.scope.noPhotoReason) { toast('Add a photo, or say why you can’t.'); return; } }
+      else if (w.step === 5) { w.slot = v('slot'); w.date = v('date'); w.flexDates = null; w.sched = schedForDate(w.date); var okS = schedWindowOk(w.sched, w.sched === 'flex' ? w.flexDates : [w.date]); if (okS !== true) { toast(okS); return; } if (wizHas(w, 'INVENTORY') && wizHas(w, 'CHECK_IN')) w.scope.sameVisit = fd.has('sameVisit'); if (fd.has('schedNote')) w.scope.schedNote = v('schedNote'); }
+      else { var nids = cmdSubmitMany(w); if (nids && nids.length) { S.wiz = null; if (nids.length === 1) go('job', { id: nids[0] }); else go('jobs'); toast(nids.length === 1 ? 'Request submitted' : nids.length + ' requests submitted'); } return; }
       w.step++; render(); window.scrollTo(0, 0); break;
     case 'respond': cmdRespond(j, v('answer')); break;
     case 'add-item': var dI = draftOf(j); dI.rooms[+f.dataset.r].items.push(mkItem(v('name').slice(0, 60))); saveDraft(id); render(); break;
@@ -387,15 +403,18 @@ document.addEventListener('submit', function (e) {
     case 'app-decide': cmdDecideApp(id, (e.submitter && e.submitter.value) === 'APPROVE', v('reason')) && toast('Decision saved'); break;
     case 'apply-level': cmdApplyLevel(v('note')) && toast('Application sent to LISTD'); break;
     case 'training-done': if (!fd.get('confirm')) { toast('Confirm you’ve finished the training.'); return; } cmdCompleteTraining(id) && toast('Training completed'); break;
-    case 'staff-invite': if (cmdStaffInvite(v('name'), v('email'), v('role'))) { S.modal = null; toast('Staff member added'); render(); } break;
-    case 'staff-transfer': if (!fd.get('confirm')) { toast('Tick the box to confirm.'); return; } if (cmdStaffTransfer(S.modal.id)) { S.modal = null; toast('Ownership transferred'); render(); } break;
+    case 'staff-invite': if (!v('name') || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v('email'))) { toast('Enter their name and a valid work email.'); return; } keyDecision('staff-invite', { name: v('name'), email: v('email'), role: v('role') }); break;
+    case 'staff-transfer': if (!fd.get('confirm')) { toast('Tick the box to confirm.'); return; } keyDecision('staff-transfer', { id: S.modal.id }); break;
     case 'pro-invite': cmdInvitePro(v('first'), v('email')).then(function (r) { if (r) { S.modal = { type: 'invite', done: r }; render(); toast('Invitation created'); } }); break;
     case 'inv-create': var nj = cmdCreateInvoice(f); if (nj) { S.modal = null; toast('Invoice ' + invNo(D.jobs[nj.id], (D.jobs[nj.id].quotes || []).length) + ' sent to client'); render(); } break;
     case 'training-add': if (trainingAdd(fd)) { S.modal = null; toast('Training added'); render(); } break;
-    case 'policies': if (!staffGuard('policies', 'change policies')) return;
-      var g = {}, cur = settings().guide; Object.keys(cur).forEach(function (k) { g[k] = {}; Object.keys(cur[k]).forEach(function (fk) { g[k][fk] = fd.has('g_' + k + '_' + fk) ? toP(v('g_' + k + '_' + fk)) : cur[k][fk]; }); });
-      var ns = { company: { name: v('coName') || 'LISTD Inventory', address: v('coAddr'), phone: v('coPhone'), email: v('coEmail') }, guide: g, quoteValidityDays: Math.max(1, +v('quoteValidityDays') || 7), offerValidityHours: Math.max(1, +v('offerValidityHours') || 12), reviewHours: Math.max(1, +v('reviewHours') || 48), rescheduleHours: Math.max(0, +v('rescheduleHours') || 24), proFeePct: Math.min(100, Math.max(0, +v('proFeePct') || 0)), repairCategories: v('repairCategories').split(',').map(function (x) { return x.trim(); }).filter(Boolean), levels: [1, 2, 3, 4, 5].map(function (k) { var r = lvRule(k); return { minJobs: fd.has('lv_' + k + '_jobs') ? Math.max(0, Math.round(+v('lv_' + k + '_jobs') || 0)) : r.minJobs, minRating: fd.has('lv_' + k + '_rating') ? Math.min(5, Math.max(0, +v('lv_' + k + '_rating') || 0)) : r.minRating, sharePct: fd.has('lv_' + k + '_share') ? Math.min(100, Math.max(0, +v('lv_' + k + '_share') || 0)) : r.sharePct }; }) };
-      setDoc('settings', 'policy', ns); audit('policy.update', 'policy', 'policy', v('reason'), ns); toast('Policies saved'); f.querySelector('[name=reason]').value = ''; break;
+    case 'pricing': if (!isMainAdmin()) { toast('Only the Main admin can change prices.'); return; } sendPriceCode('pricing', pricePhone(), { pr: readPricingForm(fd), reason: v('reason') }); break;
+    case 'client-rate': if (!isMainAdmin()) { toast('Only the Main admin can set negotiated rates.'); return; } sendPriceCode('client-rate', pricePhone(), { clientId: f.dataset.id, pct: v('pct'), reason: 'Negotiated portfolio rate' }); break;
+    case 'price-phone': var np = normPhone(v('phone')); if (!np) { toast('Enter a UK mobile number, or an international number starting with +.'); return; } if (pricePhone() && np === pricePhone()) { toast('That’s already the phone for price changes.'); return; } sendPriceCode(pricePhone() ? 'phone-old' : 'phone', pricePhone() || np, { newPhone: np }); break;
+    case 'price-code': verifyPriceCode(v('code')).then(function (x) { if (x) priceCodeDone(x); else render(); }); break;
+    case 'policies': if (!staffGuard('policies', 'change policies')) return; if (!isMainAdmin()) { toast('Only the Main admin can change catalogue & policies.'); return; }
+      var ns = { company: { name: v('coName') || 'LISTD Inventory', address: v('coAddr'), phone: v('coPhone'), email: v('coEmail') }, quoteValidityDays: Math.max(1, +v('quoteValidityDays') || 7), offerValidityHours: Math.max(1, +v('offerValidityHours') || 12), reviewHours: Math.max(1, +v('reviewHours') || 48), rescheduleHours: Math.max(0, +v('rescheduleHours') || 24), repairCategories: v('repairCategories').split(',').map(function (x) { return x.trim(); }).filter(Boolean), levels: [1, 2, 3, 4, 5].map(function (k) { var r = lvRule(k); return { minJobs: fd.has('lv_' + k + '_jobs') ? Math.max(0, Math.round(+v('lv_' + k + '_jobs') || 0)) : r.minJobs, minRating: fd.has('lv_' + k + '_rating') ? Math.min(5, Math.max(0, +v('lv_' + k + '_rating') || 0)) : r.minRating }; }) };
+      keyDecision('policies', { ns: ns, reason: v('reason') }); break;
   }
 });
 
