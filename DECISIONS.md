@@ -100,6 +100,25 @@
 - **Ownership.** There is always exactly one Main admin. They can hand the role to another active staff member, and become a Sub-admin themselves. The Main admin can't be removed.
 - **Enforcement.** Sections are hidden and the matching actions are refused in the app. Server-side permission checks are a production blocker.
 
+## Two-factor authentication (updated 23 Oct 2026, user instruction)
+- Two-factor is off by default for every role, Admin included. Users switch it on in Settings › Sign-in & security. Switching it on shows the QR code and setup key, and it only takes effect once they enter a 6-digit code from their authenticator app.
+- Admin set-up no longer forces an authenticator.
+- Accounts that already have two-factor keep it until the user switches it off, which needs their password.
+
+## Six services and multi-service booking (added 23 Oct 2026, user instruction)
+- **The six services**, in this order:
+  - Inventory: inspection and full schedule of condition
+  - Check-In: tenant walk-through and sign-off
+  - Mid-Term: condition inspection during the tenancy
+  - Check-Out: end-of-tenancy property condition and sign-off
+  - Repairs & Damages: priced from the damage and invoiced
+  - Cleaning: Light, General or Deep
+- **Booking several at once.** Clients can select any number of services in one request. LISTD creates one linked request per service, booked together, each with its own quote (an invoice for repairs), payment, Pro and report. Shared details (rooms, keys, tenant name, access, timing) are entered once.
+- **Inspection reports.** All four inspections use the LISTD Inventory report format. Mid-Term and Check-Out compare with the latest released check-in or inventory. Check-In starts from the latest inventory. Check-In and Check-Out reports need the tenant walk-through sign-off: signed, signed with comments, declined, or tenant not present. The sign-off appears in the report and the PDF. PDF titles follow the service.
+- **Pros and pricing.** Pros choose the new skills (Inventory, Mid-term). Every inspection needs Level 4, or Level 5 for 4+ bedrooms. The price guide adds Inventory (£90 base, £15 per extra bedroom) and Mid-Term (£50 base, £8 per extra bedroom). These are placeholders to confirm.
+- **Website.** It lists all six services in the menu, hero tabs, service cards, mobile menu and footer.
+- **Colour.** Repairs & Damages has its own amber colour token (`--service-repairs`).
+
 ## Departures (and why)
 - **Cleaning catalogue:** the website's Light / General / Deep Clean is used instead of the four recovered services and five add-ons (user decision, 22 Oct 2026).
 - **Auth:** identity is the viewer's Claude account. Each person creates client/Pro profiles tied to their account id; "sign out" leaves the profile on that device. Admin = editors of the workspace. No email/password, password reset or MFA. These need the production backend.
@@ -112,3 +131,65 @@
 
 ## Production blockers
 Real auth with MFA and Admin invitations; a server API with tenant policies; a Postgres schema; a payment provider marketplace account with webhooks; private object storage with malware scanning; a background worker; transactional email; a server-side vision model with logging and retention rules for AI photo analysis; legal terms, retention policy and final pricing.
+
+## Pricing: pilot framework (25 October 2026)
+
+Implemented from *LISTD Pricing Strategy, 24 October 2026*. All figures are pilot prices to test, editable by the Main admin under Admin › Pricing.
+
+- **One service standard.** Flex, Core and Priority no longer imply different workmanship. Flex, Standard and Priority are now scheduling options: Flex is −£10 (three or more dates, five or more working days ahead, LISTD picks), Standard is the base price (two or more working days ahead), Priority is +£30 (within two working days, £20 to the Pro, £10 to LISTD). Priority and Flex can each be switched off when capacity or savings aren't there.
+- **Inspection rate card** by size (studio to 4 bedrooms; 5+ is a custom quote): Inventory & Condition, standalone check-in handover, Inventory + check-in in the same visit, and check-out, exactly as in the strategy. The two same-visit jobs stay separate requests, with the saving shown as a line on the inventory.
+- **Mid-term prices are an assumption** (£60, £65, £75, £85, £95): the strategy has no mid-term column. Confirm or change them under Pricing.
+- **One complexity adjustment:** part-furnished +£10, furnished +£20 (studio–2 bed) or +£30 (3–4 bed), heavily furnished is a custom quote. No per-bedroom fee. Extra bathrooms, kitchens and reception rooms are £10 each and outbuildings or extensive outdoor areas £15 each (assumed values for the strategy's "clearly explained adjustments"). Properties far larger than their bedroom count go to LISTD for review.
+- **Instant fixed quotes** for inspections and repair diagnosis visits. Cleaning shows an estimate (±15%) from expected cleaner-hours, then LISTD issues a fixed quote. Repairs are a fixed task price, or a £50 diagnostic visit credited once against the repair change order.
+- **Cleaning types** are now Standard Home, Deep, End of Tenancy and Office, with stated inclusions and add-ons. Level gating: Level 1 Standard; Level 2 adds End of Tenancy and Office; Level 3 adds Deep. Older Light and General requests still open as Standard.
+- **Pro fees from workload,** not a percentage: attendance allowance + expected minutes × the Pro's level hourly rate + approved complexity and Priority allowances. Hourly rates (£14–£22) and minutes are assumptions tuned so a 2-bed inventory pays £55, matching the strategy's illustration. The offer recalculates the fee for the chosen Pro.
+- **Contribution floor:** £25 or 25% of revenue excluding tax, whichever is higher, after the Pro fee, payment costs (1.5% + 20p), £5 support and reporting per job, and a 3% rework allowance. Shown on every quote in Admin; the pilot table flags jobs below the floor.
+- **Portfolio pricing:** pay per completed job, no subscription. 10–24 completed jobs a month earns up to 5% rebate on eligible service fees (not materials, travel or Priority), capped so no job falls below the floor; Admin records the rebate. 25+ is a negotiated rate set per client.
+- **VAT** defaults to 0% until the tax treatment is confirmed; set it under Pricing.
+- **Pilot measures** on Admin › Pricing: quote acceptance and decline reasons, Pro offer acceptance, actual vs expected job time, contribution by service group, corrections, complaints, repeat clients, Priority fulfilment and Flex discounts.
+- **Website:** the Pricing page shows the scheduling options, the rate card, the furnishing adjustment with the worked example (£165, or £195 with Priority), maintenance pricing and portfolio pricing, labelled as pilot prices for Bristol. This overrides the brand guideline's "no prices in brand material" rule for the Pricing page.
+
+### Price changes need the Main admin and a phone code (25 October 2026)
+
+- Only the Main admin can change the rate card, scheduling, Pro fee model, floor, rebate tiers, VAT and negotiated client rates. Sub-admins see Pricing read-only; Operations can't open it.
+- The Main admin first confirms a mobile number with a 6-digit code. Changing that number needs a code to the current number first, then to the new one.
+- Every save sends a fresh 6-digit code to that phone. Codes expire after 10 minutes, allow 5 attempts and can be resent after 30 seconds. Each code is tied to the change it approves. Sends, failures and verified changes are audited (the number is masked).
+- **Test mode:** no SMS provider is connected, so the text is shown in the code dialog, clearly labelled. **Production blocker:** generate, send (via an SMS provider such as Twilio or Vonage) and check the code on the server, and enforce the Main-admin rule in the API. The browser-side check here is a demo only.
+- Per-job quotes in the quote builder are unchanged; Sub-admins and Operations still issue those.
+
+### Flex removed (25 October 2026)
+
+Flex scheduling (−£10 for flexible dates) is no longer offered. Clients choose Standard (base price, two or more working days ahead) or Priority (+£30 within two working days). The Admin Pricing page no longer shows Flex settings, and older Flex bookings keep their original quotes.
+
+## Admin Analytics (25 October 2026)
+
+Admin › Analytics (Main admin and Sub-admins) explains LISTD's contribution and ranks what moves it.
+
+- **Contribution** = net revenue (excl. tax, after refunds) − Pro fees − payment, support and rework costs (Pricing assumptions) − rebates. It must still cover overheads.
+- **Driver tree:** Contribution = Paid jobs × Contribution per paid job − Rebates. Paid jobs = Requests × Requests quoted × Quote acceptance × Payment conversion. Contribution per paid job = Avg revenue × (1 − Refund rate) × (1 − Pro fee share) − Direct cost per job. The tree reproduces the bridge exactly (tested).
+- **Ranking (shown as #1–#9 on the driver tree; the separate "Biggest levers" list was removed on 25 Oct):** each driver is improved 10% in the helpful direction with the others held still; the contribution gained orders the list. The four volume drivers multiply, so they tie; the page says so.
+- **Leading indicators** under each lever show what moves it: time to price, decline reasons and expiries, time to pay, Priority share and room adjustments, disputes and cancellations, Pro level mix and time versus expected, corrections, rebates.
+- Also: a contribution bridge, booking funnel, contribution by service and by month, with a 30-day, 90-day, 12-month or all-time filter. Single-series charts use sky blue (#1F6FB2 light, #3A86CC dark), validated for contrast and colour-vision safety.
+- **Charts added (25 Oct):** pie (donut) charts for revenue by service, revenue by client type and where each £ of revenue goes; bar charts for revenue and contribution by month and requests by service (each with a table view); a location map of requests by postcode district with Pro-coverage gaps flagged, a Bristol & Bath zoom, and top areas by contribution. The map is drawn in the app from approximate postcode-district centres (no map tiles or third-party map service); swap in a mapping provider in production for street-level detail. Categorical colours use the validated chart palette (blue, orange, aqua, yellow, magenta, violet) with values and shares always labelled.
+- **Operations analytics (25 Oct):** Disputes (raised, settled, open, median time to settle, raised vs settled pie, outcomes and reasons, disputes per 100 completed jobs), Invoices for repairs and extra work (tiles for issued, paid, unpaid and median time to pay, plus one bar chart of paid vs unpaid invoice value by month issued, labelled with the % paid each month), Paid vs completed jobs (pie and monthly bars), and Pro performance (offer acceptance, completion rate, on-time arrival within 15 minutes, time vs expected, rating, corrections, disputes, jobs per week; shown as summary tiles and a productivity-rate chart. The per-Pro completed-jobs chart and table were removed on 25 Oct).
+
+### Key decisions need the Main admin's phone code (25 October 2026)
+
+- The Main admin adds and confirms a mobile number under **My settings › Account** (a code is sent to it first). Changing it needs a code to the current number, then the new one.
+- These key decisions are Main-admin only and each needs a fresh 6-digit code sent to that number: price changes and negotiated client rates (Pricing), catalogue & policies (levels, report header, policies), and staff changes (adding staff, changing a role, removing access, handing over the Main admin role).
+- Until a number is confirmed those actions are blocked, with a prompt to add one. Codes expire after 10 minutes, allow 5 attempts, can be resent after 30 seconds, approve only the change they were sent for, and are audited.
+- After a handover the new Main admin confirms their own number before making key decisions.
+- Test mode shows the text in the code dialog. Production blocker: send and verify codes on the server through an SMS provider.
+
+### Priority is set by the date (25 October 2026)
+
+Clients no longer choose Standard or Priority. Any date within two working days (the Priority setting on Admin › Pricing) is a Priority booking at +£30, shown as soon as the date is picked; later dates are Standard. When Priority is switched off, the earliest date offered is the first Standard day.
+
+## Pricing end to end (25 Oct 2026)
+- One rate card everywhere: website pricing page, client quotes, Admin › Pricing and Pro fees all read the same figures (Inventory £85–£160, standalone check-in £60–£75, Inventory + Check-in same visit £110–£185, mid-term £60–£95, check-out £75–£150; 5+ bedrooms custom).
+- Furnishing is charged once: unfurnished £0, part +£10, furnished +£20 (studio–2 bed) / +£30 (3–4 bed), heavy = custom quote. Extra bathroom/kitchen/reception £10 each; outbuildings and outdoor areas £15 each.
+- Priority (+£30, £20 of it to the Pro) is applied automatically for dates within 2 working days.
+- Same-visit Inventory + Check-in is shown as two positive lines (inventory part = combo − standalone check-in, plus the check-in), never a discount line. Furnishing, extras and Priority sit on the inventory.
+- Services booked together get one checkout ("Accept & pay £X") on the client's job page; each service still keeps its own quote, payment record and report.
+- Pro fees are rounded to the nearest 50p, and Pros and admins see an itemised "How your fee is worked out" (attendance, expected time × level rate, allowances).
+- Pros never see client prices or payment amounts in job history.

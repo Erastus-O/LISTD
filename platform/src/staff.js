@@ -10,6 +10,7 @@ var STAFF_ROLES = {
 /* which roles can open each Admin section */
 var STAFF_AREAS = [
   ['home', 'Overview & work queues', ['MAIN', 'SUB', 'OPS']],
+  ['analytics', 'Analytics: bottom-line drivers', ['MAIN', 'SUB']],
   ['requests', 'Requests, quotes & job pages', ['MAIN', 'SUB', 'OPS']],
   ['assign', 'Assignments & calendar', ['MAIN', 'SUB', 'OPS']],
   ['reviews', 'Report reviews', ['MAIN', 'SUB', 'OPS']],
@@ -17,6 +18,8 @@ var STAFF_AREAS = [
   ['clients', 'Clients & properties', ['MAIN', 'SUB', 'OPS']],
   ['disputes', 'Disputes & outcomes', ['MAIN', 'SUB']],
   ['finance', 'Finance: refunds & Pro payouts', ['MAIN', 'SUB']],
+  ['pricing', 'Pricing: view the rate card, rebates & pilot measures', ['MAIN', 'SUB']],
+  ['pricing-edit', 'Change prices & negotiated rates (code to the Main admin’s phone)', ['MAIN']],
   ['pros', 'Pros: invitations, approvals & levels', ['MAIN', 'SUB']],
   ['training', 'Training library', ['MAIN', 'SUB']],
   ['audit', 'Audit log', ['MAIN', 'SUB']],
@@ -55,7 +58,7 @@ function staffGuard(area, what) { if (S.role !== 'admin' || staffCan(area)) retu
 
 /* ---------- commands (Main admin only) ---------- */
 function cmdStaffInvite(name, email, role) {
-  if (!staffGuard('team', 'add staff')) return false;
+  if (!staffGuard('team', 'add staff')) return false; if (!keyPass('staff-invite')) return deny('Confirm with the code sent to the Main admin’s phone.');
   email = normEmail(email); name = String(name || '').trim();
   if (!name) return deny('Enter their name.');
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return deny('Enter a valid work email.');
@@ -65,20 +68,20 @@ function cmdStaffInvite(name, email, role) {
   audit('staff.invite', 'staff', id, 'Invited ' + email + ' as ' + STAFF_ROLES[role].label); return id;
 }
 function cmdStaffRole(id, role) {
-  if (!staffGuard('team', 'change roles')) return false;
+  if (!staffGuard('team', 'change roles')) return false; if (!keyPass('staff-role')) return deny('Confirm with the code sent to the Main admin’s phone.');
   var x = D.staff[id]; if (!x) return false; if (x.role === 'MAIN') return deny('Transfer ownership to change the Main admin.');
   if (!STAFF_ROLES[role] || role === 'MAIN') return deny('Choose Sub-admin or Operations.');
   patchDoc('staff', id, { role: role, status: x.status === 'PENDING' || x.status === 'REMOVED' ? 'ACTIVE' : x.status });
   audit('staff.role', 'staff', id, (x.email) + ' → ' + STAFF_ROLES[role].label, { from: x.role, to: role }); return true;
 }
 function cmdStaffRemove(id) {
-  if (!staffGuard('team', 'remove staff')) return false;
+  if (!staffGuard('team', 'remove staff')) return false; if (!keyPass('staff-remove')) return deny('Confirm with the code sent to the Main admin’s phone.');
   var x = D.staff[id]; if (!x) return false; if (x.role === 'MAIN') return deny('The Main admin can’t be removed. Transfer ownership first.');
   if (x.status === 'INVITED') patchDoc('staff', id, { status: 'DELETED' }); else patchDoc('staff', id, { status: 'REMOVED', removedAt: now() });
   audit('staff.remove', 'staff', id, (x.email) + ' removed'); return true;
 }
 function cmdStaffTransfer(id) {
-  if (!staffGuard('team', 'transfer ownership')) return false;
+  if (!staffGuard('team', 'transfer ownership')) return false; if (!keyPass('staff-transfer')) return deny('Confirm with the code sent to the Main admin’s phone.');
   var x = D.staff[id], me2 = myStaff(); if (!x || !me2 || x.status !== 'ACTIVE' || x.id === me2.id) return deny('Choose an active staff member.');
   patchDoc('staff', id, { role: 'MAIN' }); patchDoc('staff', me2.id, { role: 'SUB' });
   audit('staff.transfer', 'staff', id, 'Main admin transferred to ' + x.email); notify('admin', (x.name || x.email) + ' is now the Main admin'); return true;
@@ -88,14 +91,21 @@ function cmdStaffTransfer(id) {
 function setTeam() {
   var main = staffCan('team'), all = staffList().sort(function (a, b) { var o = { MAIN: 0, SUB: 1, OPS: 2 }; return ((o[a.role] != null ? o[a.role] : 3) - (o[b.role] != null ? o[b.role] : 3)) || String(a.name).localeCompare(String(b.name)); }), mine = myStaff();
   var stB = function (x) { return x.status === 'ACTIVE' ? badge('Active', 'success') : x.status === 'INVITED' ? badge('Invited', 'info') : x.status === 'PENDING' ? badge('Needs a role', 'warning') : badge('Removed', ''); };
-  var h = '<div class="a-sethead a-row sb"><div><h2>Users & roles</h2><p>' + (main ? 'Give LISTD staff access by role. You’re the Main admin, the sole owner of this account.' : 'Who has access to the admin panel. Only the Main admin can change roles.') + '</p></div>' + (main ? '<button type="button" class="ld-btn ld-btn-primary" data-act="staff-add">' + ic('plus', 18) + ' Add staff member</button>' : '') + '</div>';
+  var tab = S.teamTab === 'roles' ? 'roles' : 'staff';
+  var h = '<div class="a-sethead"><div><h2>Users & roles</h2><p>' + (main ? 'Give LISTD staff access by role. You’re the Main admin, the sole owner of this account.' : 'Who has access to the admin panel. Only the Main admin can change roles.') + '</p></div></div>';
+  h += '<div class="a-segtabs" role="tablist" aria-label="Users and roles"><button type="button" role="tab" id="tt-staff" aria-controls="tp-team" data-act="team-tab" data-t="staff" aria-selected="' + (tab === 'staff') + '">' + ic('users', 16) + 'Staff <span class="a-fine">' + all.filter(function (x) { return x.status !== 'REMOVED'; }).length + '</span></button><button type="button" role="tab" id="tt-roles" aria-controls="tp-team" data-act="team-tab" data-t="roles" aria-selected="' + (tab === 'roles') + '">' + ic('lock', 16) + 'Roles</button></div><div id="tp-team" role="tabpanel" aria-labelledby="tt-' + tab + '" style="display:grid;gap:18px">';
+  if (tab === 'roles') {
   h += '<div class="a-grid k3 a-roles3">' + ['MAIN', 'SUB', 'OPS'].map(function (r) { var n = all.filter(function (x) { return x.role === r && x.status === 'ACTIVE'; }).length; return '<div class="a-card a-rolecard r-' + r.toLowerCase() + '"><div class="a-row sb"><b>' + STAFF_ROLES[r].label + '</b><span class="a-fine">' + n + ' ' + (n === 1 ? 'person' : 'people') + '</span></div><p class="a-fine">' + STAFF_ROLES[r].d + '</p></div>'; }).join('') + '</div>';
-  h += '<section class="a-sec"><h3 class="a-subh">Staff</h3><div class="a-tw"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Since</th>' + (main ? '<th></th>' : '') + '</tr></thead><tbody>' + all.map(function (x) {
+  }
+  if (tab === 'staff') {
+  h += '<section class="a-sec"><div class="a-row sb"><h3 class="a-subh">Staff</h3>' + (main ? '<button type="button" class="ld-btn ld-btn-primary" data-act="staff-add">' + ic('plus', 18) + ' Add staff member</button>' : '') + '</div><div class="a-tw"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Since</th>' + (main ? '<th></th>' : '') + '</tr></thead><tbody>' + all.map(function (x) {
     var you = mine && x.id === mine.id, roleCell = x.role === 'MAIN' ? '<b>' + STAFF_ROLES.MAIN.label + '</b>' : main && x.status !== 'REMOVED' ? '<label class="sr-only" for="sr-' + x.id + '">Role for ' + esc(x.name || x.email) + '</label><select class="a-mini" id="sr-' + x.id + '" data-staffrole="' + x.id + '">' + (x.role ? '' : '<option value="">Choose a role</option>') + ['SUB', 'OPS'].map(function (r) { return '<option value="' + r + '"' + (x.role === r ? ' selected' : '') + '>' + STAFF_ROLES[r].label + '</option>'; }).join('') + '</select>' : esc(x.role ? STAFF_ROLES[x.role].label : '—');
     var acts = !main || x.role === 'MAIN' ? '' : (x.status === 'ACTIVE' ? '<button type="button" class="ld-btn ld-btn-ghost ld-btn-sm" data-act="staff-transfer" data-id="' + x.id + '">Make Main admin</button>' : '') + (x.status === 'REMOVED' ? '' : '<button type="button" class="ld-btn ld-btn-ghost ld-btn-sm a-danger" data-act="staff-remove" data-id="' + x.id + '">' + (x.status === 'INVITED' ? 'Cancel invite' : 'Remove access') + '</button>');
     return '<tr><td><b>' + esc(x.name || '—') + '</b>' + (you ? ' <span class="a-fine">(you)</span>' : '') + '</td><td>' + esc(x.email || '') + '</td><td>' + roleCell + '</td><td>' + stB(x) + '</td><td class="nw">' + fdate(x.joinedAt || x.createdAt) + '</td>' + (main ? '<td class="r"><span class="a-row" style="gap:4px;justify-content:flex-end;flex-wrap:nowrap">' + acts + '</span></td>' : '') + '</tr>';
   }).join('') + '</tbody></table></div>' + (all.some(function (x) { return x.status === 'INVITED'; }) ? '<p class="a-fine">Invited staff join when they set up admin sign-in with the invited email. They also need edit access to this workspace (Share › Can edit).</p>' : '') + '</section>';
-  h += '<section class="a-sec"><h3 class="a-subh">What each role can do</h3><div class="a-tw a-fit"><table class="a-perm"><thead><tr><th>Area</th>' + ['MAIN', 'SUB', 'OPS'].map(function (r) { return '<th class="c">' + STAFF_ROLES[r].label + '</th>'; }).join('') + '</tr></thead><tbody>' + STAFF_AREAS.map(function (z) { return '<tr><td>' + esc(z[1]) + '</td>' + ['MAIN', 'SUB', 'OPS'].map(function (r) { var ok = z[2].indexOf(r) >= 0; return '<td class="c">' + (ok ? '<span class="a-yes" aria-label="Yes">' + ic('check', 16) + '</span>' : '<span class="a-no" aria-label="No">—</span>') + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div></section>';
+  }
+  if (tab === 'roles') h += '<section class="a-sec"><h3 class="a-subh">What each role can do</h3><div class="a-tw a-fit"><table class="a-perm"><thead><tr><th>Area</th>' + ['MAIN', 'SUB', 'OPS'].map(function (r) { return '<th class="c">' + STAFF_ROLES[r].label + '</th>'; }).join('') + '</tr></thead><tbody>' + STAFF_AREAS.map(function (z) { return '<tr><td>' + esc(z[1]) + '</td>' + ['MAIN', 'SUB', 'OPS'].map(function (r) { var ok = z[2].indexOf(r) >= 0; return '<td class="c">' + (ok ? '<span class="a-yes" aria-label="Yes">' + ic('check', 16) + '</span>' : '<span class="a-no" aria-label="No">—</span>') + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div></section>';
+  h += '</div>';
   return h;
 }
 function staffModal() {

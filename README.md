@@ -66,9 +66,9 @@ Links that leave the site:
 
 | Product | What it covers |
 |---|---|
-| Client | Onboarding for four client types. Properties. Requests for Check-In, Check-Out, Repairs & Damages and Cleaning (Light, General or Deep). Quotes, or invoices for repairs, and test payments. Report review, disputes, ratings, receipts. Settings with optional two-factor. |
+| Client | Onboarding for four client types. Properties. Requests for any mix of six services in one booking: Inventory, Check-In (tenant walk-through and sign-off), Mid-Term, Check-Out (end-of-tenancy condition and sign-off), Repairs & Damages, and Cleaning (Light, General or Deep). Instant fixed prices for inspections from the rate card, Flex / Standard / Priority scheduling, cleaning estimates then fixed quotes, repair invoices or paid diagnosis, portfolio rebates, and test payments. Report review, disputes, ratings, receipts. Settings with optional two-factor. |
 | Pro | Sign-up with email and password, or joining by Admin invitation. Onboarding with documents and payouts. Offers, schedule, clock-in and out with photos. Inspection reports in the LISTD Inventory format with AI-drafted descriptions the Pro checks, plus the PDF. Cleaning and repair reports. Earnings. Training & level. |
-| Admin | Overview and work queues. Requests table. Assignments calendar. Quote builder, invoicing for repairs and Create invoice. Report reviews. Disputes and finance. Pros table, Pro detail pages, invitations, applications and levels. Training library. Clients, properties, catalogue and policies, audit log. Settings › Users & roles (Main admin, Sub-admin, Operations). |
+| Admin | Overview and work queues. Analytics: bottom-line drivers ranked by impact. Pricing: rate card, Pro fee model, contribution floor, rebates and pilot measures. Requests table. Assignments calendar. Quote builder, invoicing for repairs and Create invoice. Report reviews. Disputes and finance. Pros table, Pro detail pages, invitations, applications and levels. Training library. Clients, properties, catalogue and policies, audit log. Settings › Users & roles (Main admin, Sub-admin, Operations). |
 
 ### Build
 
@@ -80,7 +80,7 @@ This writes four files to `dist/`. `listd-platform.html` holds all three product
 
 The source files share one global scope and are concatenated in this order:
 
-`core, auth, actions, client, job, pro, settings, inspect, pdf, admin, levels, staff, app`
+`core, pricing, auth, actions, client, job, pro, settings, inspect, pdf, admin, analytics, levels, staff, app`
 
 ### External scripts
 
@@ -100,13 +100,16 @@ make test
 | Test | Covers |
 |---|---|
 | `check_portals.py` | Each single-product build opens on its own sign-in screen |
-| `e2e_auth.py` | Sign-up, sign-in, lockout, reset, sign-out, Admin two-step, claiming older profiles |
+| `e2e_auth.py` | Sign-up, sign-in, lockout, reset, sign-out, two-factor on and off for Admin, claiming older profiles |
 | `e2e_settings.py` | Account, billing, email change, 2FA on and off, notifications, theme, data export, account closure |
 | `e2e_cross_portal.py` | Pro sign-in with an existing client login, and "Set up sign-in" |
 | `e2e_invite.py` | Admin invites a Pro: code, link, resend, cancel. Pro verifies, creates a password and onboards |
 | `e2e_staff.py` | Users & roles: Main admin, invited Sub-admin and Operations, access limits, ownership transfer |
 | `e2e_levels.py` | Trainings, join and level applications, training gate for Levels 4 and 5, job eligibility by level |
 | `e2e_invoicing.py` | Admin creates repair invoices, for a new repair or an existing request |
+| `e2e_services.py` | The six services, booking several at once as linked requests, per-service details, baselines, Pro eligibility by skill and level |
+| `e2e_pricing.py` | Pilot pricing: rate card, furnishing, same-visit inventory + check-in, Flex and Priority, instant quotes, cleaning estimates, diagnosis credit, Pro fees, contribution floor, rebates, Admin Pricing |
+| `e2e_analytics.py` | Admin Analytics: contribution bridge, driver formula, levers ranked by impact, funnel, service mix, access by role |
 | `e2e_full_lifecycle.py` | Check-in, check-out, repairs (invoice, change order, dispute) and cleaning (auto-complete), through to payout |
 | `e2e_inspection_ai.py` | AI drafts, the Pro checks them, PDF download. Needs `JSPDF_PATH` pointing at a local `jspdf.umd.min.js` (`npm pack jspdf@2.5.1`) |
 

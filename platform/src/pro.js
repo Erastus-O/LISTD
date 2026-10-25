@@ -107,7 +107,7 @@ function rf(j, path, val, label, opts) { var id = 'rf-' + path.replace(/\./g, '-
 
 function proWorkBlock(j) {
   var k = svcKey(j), r = draftOf(j), all = evFor({ jobId: j.id }), a = j.attendance || {}, h = '<div class="a-sec"><h2>Report<span class="a-fine">Saved automatically</span></h2>';
-  if (k === 'CHECK_IN' || k === 'CHECK_OUT') {
+  if (isInspK(k)) {
     h += inspEditor(j);
   } else if (k === 'CLEANING') {
     h += '<div class="a-card"><h3>' + CLEANS[j.scope.clean].label + ' checklist</h3><p class="a-fine">Tick each item, or say why it doesn’t apply.</p>' + r.checklist.map(function (c, i) { return '<div class="a-ck" style="flex-wrap:wrap"><input type="checkbox" id="ck-' + i + '" data-ck="' + i + '" data-id="' + j.id + '"' + (c.done ? ' checked' : '') + '><label for="ck-' + i + '" style="flex:1">' + esc(c.t) + '</label>' + (!c.done ? '<input class="ld-input a-note" style="flex-basis:100%" id="na-' + i + '" data-rf="checklist.' + i + '.na" data-id="' + j.id + '" placeholder="Not applicable because…" value="' + esc(c.na) + '" aria-label="Reason not applicable: ' + esc(c.t) + '">' : '') + '</div>'; }).join('') + '</div>' +
@@ -126,7 +126,7 @@ function proWorkBlock(j) {
 }
 function validateReport(j) {
   var k = svcKey(j), r = draftOf(j), all = evFor({ jobId: j.id });
-  if (k === 'CHECK_IN' || k === 'CHECK_OUT') {
+  if (isInspK(k)) {
     return inspValidate(j);
   } else if (k === 'CLEANING') {
     var miss = r.checklist.filter(function (c) { return !c.done && !String(c.na || '').trim(); }); if (miss.length) return 'Tick or give a reason for every checklist item (' + miss.length + ' left).';
