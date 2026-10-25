@@ -149,6 +149,7 @@ make test
 | `e2e_services.py` | The six services, booking several at once as linked requests, per-service details, baselines, Pro eligibility by skill and level |
 | `e2e_pricing.py` | Pilot pricing: rate card, furnishing, same-visit inventory + check-in, Flex and Priority, instant quotes, cleaning estimates, diagnosis credit, Pro fees, contribution floor, rebates, Admin Pricing |
 | `e2e_analytics.py` | Admin Analytics: contribution bridge, driver formula, levers ranked by impact, funnel, service mix, access by role |
+| `e2e_quote_update.py` | Issued quotes show as sent to the client; Update quote needs a reason, supersedes the old version and notifies the client |
 | `e2e_full_lifecycle.py` | Check-in, check-out, repairs (invoice, change order, dispute) and cleaning (auto-complete), through to payout |
 | `e2e_inspection_ai.py` | AI drafts, the Pro checks them, PDF download. Needs `JSPDF_PATH` pointing at a local `jspdf.umd.min.js` (`npm pack jspdf@2.5.1`) |
 

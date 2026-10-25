@@ -242,7 +242,7 @@ function evFor(f) { return list('evidence').filter(function (e) { for (var k in 
 /* ---------- small UI parts ---------- */
 function isInv(j) { return !!j && svcKey(j) === 'REPAIRS_DAMAGES'; }
 function qWord(j, cap) { var w = isInv(j) ? 'invoice' : 'quote'; return cap ? w.charAt(0).toUpperCase() + w.slice(1) : w; }
-function statusPill(s, j) { var x = STATUS[s] || [s, 'var(--border)']; if (isInv(j) && { SUBMITTED: 1, QUOTED: 1 }[s]) x = [s === 'SUBMITTED' ? 'Being assessed' : 'Invoice ready', x[1]]; return '<span class="ld-pill" style="--c:' + x[1] + '"><i aria-hidden="true"></i>' + esc(x[0]) + '</span>'; }
+function statusPill(s, j) { var x = STATUS[s] || [s, 'var(--border)']; if (isInv(j) && { SUBMITTED: 1, QUOTED: 1 }[s]) x = [s === 'SUBMITTED' ? 'Being assessed' : 'Invoice ready', x[1]]; if (s === 'QUOTED' && S.role === 'admin') x = [isInv(j) ? 'Invoice sent' : 'Quote sent', x[1]]; return '<span class="ld-pill" style="--c:' + x[1] + '"><i aria-hidden="true"></i>' + esc(x[0]) + '</span>'; }
 function svcTag(j) { var k = SVC[svcKey(j)] || SVC.CHECK_IN; return '<span class="ld-tag" style="--t:' + k.t + ';--tx:' + k.tx + '">' + ic(k.icon, 16) + esc(k.label) + '</span>'; }
 function condChip(c) { var x = COND[c] || COND.na; return '<span class="ld-cond" style="--c:' + x[1] + ';--t:' + x[2] + '">' + x[0] + '</span>'; }
 function badge(text, tone, icon) { return '<span class="ld-badge' + (tone ? ' ld-badge-' + tone : '') + '">' + (icon ? ic(icon, 14) : '') + esc(text) + '</span>'; }

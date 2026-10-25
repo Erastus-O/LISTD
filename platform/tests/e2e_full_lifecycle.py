@@ -45,7 +45,7 @@ with sync_playwright() as pw:
         # ---- check-in request
         nav('jobs'); p.locator('.a-main [data-go=new]').first.click(); W(); submit(); p.click('label.a-opt:has(input[value=CHECK_IN])'); submit(); opt(p, '#w-occ', 'Jo Tenant'); p.fill('#w-keys','2 sets to tenant'); submit(); submit(); p.fill('#w-date',D1); submit(); shot(p,'04-wiz-review'); submit(); log('check-in submitted '+str(state('LJ-1001')))
         # ---- admin quote
-        role('admin'); admin_setup(); shot(p,'05-admin-home'); openref('LJ-1001'); shot(p,'06-quote-builder'); btn('Issue quote to client'); log('quoted '+str(state('LJ-1001')))
+        role('admin'); admin_setup(); shot(p,'05-admin-home'); openref('LJ-1001'); shot(p,'06-quote-builder'); (btn('Issue quote to client') if p.locator('form[data-form=quote]').count() else None); log('quoted '+str(state('LJ-1001')))
         role('client'); openref('LJ-1001'); shot(p,'07-client-quote'); btn('Accept quote'); btn('Simulate a failed payment'); log('failed pay '+str(state('LJ-1001'))); p.locator('[data-act=pay]').click(); W(); log('paid '+str(state('LJ-1001'))); p.locator('[data-act=pay]').count()==0 or log('PAY BUTTON STILL THERE')
         # ---- pro onboarding
         role('pro'); signup('Sam Patel','sam@example.test')
@@ -96,7 +96,7 @@ with sync_playwright() as pw:
         role('client'); openref('LJ-1003'); btn('Accept report'); role('admin'); openref('LJ-1003'); p.locator('[data-act=payout]').first.click(); W(); log('repair payout '+str(state('LJ-1003'))+' fee='+str(p.evaluate("proFeeP(Object.values(D.jobs).find(x=>x.ref==='LJ-1003'))")))
         # ---- cleaning, auto-complete
         role('client'); nav('jobs'); p.locator('.a-main [data-go=new]').first.click(); W(); submit(); p.click('label.a-opt:has(input[value=CLEANING])'); submit(); p.click('label.a-opt:has(input[value=deep])'); submit(); submit(); p.fill('#w-date',D2); p.select_option('#w-slot','afternoon'); submit(); submit()
-        role('admin'); openref('LJ-1004'); btn('Issue quote to client'); role('client'); openref('LJ-1004'); btn('Accept quote'); p.locator('[data-act=pay]').click(); W()
+        role('admin'); openref('LJ-1004'); (btn('Issue quote to client') if p.locator('form[data-form=quote]').count() else None); role('client'); openref('LJ-1004'); btn('Accept quote'); p.locator('[data-act=pay]').click(); W()
         role('admin'); openref('LJ-1004'); p.select_option('#of-pro', index=1); p.select_option('#of-slot','afternoon'); btn('Send offer')
         role('pro'); openref('LJ-1004'); btn('Accept job'); up('input[data-up*="clock-in"]'); btn('Clock in')
         cks=p.locator('input[data-ck]').count()
