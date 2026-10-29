@@ -80,7 +80,7 @@ function unlinkedProfiles(role) {
 
 /* ---- screens ---- */
 var AUTH_COPY = {
-  client: { h: 'Every property service, one trusted record.', b: ['Book check-ins, check-outs, repairs and cleaning in minutes', 'Pay securely and only sign off when you’re happy', 'Timestamped photo reports for every visit'] },
+  client: { h: 'Every property service, one trusted record.', b: ['Book check-ins, check-outs, repairs and cleaning in minutes', 'Payment secured when you book, released when you approve the finished job', 'Timestamped photo reports for every visit'] },
   pro: { h: 'Get matched with verified work near you.', b: ['Offers that match your skills and area', 'Clear scope, fee and access details upfront', 'Paid when the client signs off'] },
   admin: { h: 'LISTD operations', b: ['Invite-only access for LISTD staff', 'Optional two-factor sign-in with an authenticator app', 'Every privileged action is logged'] }
 };

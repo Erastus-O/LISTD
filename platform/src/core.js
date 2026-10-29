@@ -32,17 +32,17 @@ var SEGMENTS = {
 var SKILLS = {
   INVENTORY: { label: 'Inventory inspections', icon: 'inventory' }, CHECK_IN: { label: 'Check-ins (walk-through & sign-off)', icon: 'check-in' },
   MID_TERM: { label: 'Mid-term inspections', icon: 'inspection' }, CHECK_OUT: { label: 'Check-outs (end of tenancy & sign-off)', icon: 'check-out' },
-  REPAIRS_DAMAGES: { label: 'Repairs & damages', icon: 'settings' }, CLEANING: { label: 'Cleaning', icon: 'cleaning' }
+  REPAIRS_DAMAGES: { label: 'Repairs & maintenance', icon: 'settings' }, CLEANING: { label: 'Cleaning', icon: 'cleaning' }
 };
 var TYPES = { INVENTORY: 'Inventory', CHECK_IN: 'Check-In', MID_TERM: 'Mid-Term', CHECK_OUT: 'Check-Out', MAINTENANCE: 'Repairs & Cleaning' };
-var KINDS = { REPAIRS_DAMAGES: 'Repairs & Damages', CLEANING: 'Cleaning' };
+var KINDS = { REPAIRS_DAMAGES: 'Repairs & Maintenance', CLEANING: 'Cleaning' };
 /* the six services, in the order clients see them */
 var SVC = {
   INVENTORY: { label: 'Inventory', icon: 'inventory', c: 'var(--service-inventory)', t: 'var(--service-inventory-subtle)', tx: 'var(--service-inventory-text)', d: 'Inspection and full schedule of condition of the property and its contents.' },
   CHECK_IN: { label: 'Check-In', icon: 'check-in', c: 'var(--service-checkin)', t: 'var(--service-checkin-subtle)', tx: 'var(--service-checkin-text)', d: 'Tenant walk-through at the start of the tenancy, with sign-off.' },
   MID_TERM: { label: 'Mid-Term', icon: 'inspection', c: 'var(--service-midterm)', t: 'var(--service-midterm-subtle)', tx: 'var(--service-midterm-text)', d: 'Condition inspection during the tenancy.' },
   CHECK_OUT: { label: 'Check-Out', icon: 'check-out', c: 'var(--service-checkout)', t: 'var(--service-checkout-subtle)', tx: 'var(--service-checkout-text)', d: 'End-of-tenancy property condition, compared with the earlier report, with sign-off.' },
-  REPAIRS_DAMAGES: { label: 'Repairs & Damages', icon: 'settings', c: 'var(--service-repairs)', t: 'var(--service-repairs-subtle)', tx: 'var(--service-repairs-text)', d: 'A fixed task price where the job is clear, or a paid diagnostic visit where it isn’t.' },
+  REPAIRS_DAMAGES: { label: 'Repairs & Maintenance', icon: 'settings', c: 'var(--service-repairs)', t: 'var(--service-repairs-subtle)', tx: 'var(--service-repairs-text)', d: 'A fixed task price where the job is clear, or a paid diagnostic visit where it isn’t.' },
   CLEANING: { label: 'Cleaning', icon: 'cleaning', c: 'var(--service-cleaning)', t: 'var(--service-cleaning-subtle)', tx: 'var(--service-cleaning-text)', d: 'Standard, Deep, End of Tenancy or Office cleaning. An estimate now, a fixed quote before you pay.' }
 };
 var INSPECTIONS = ['INVENTORY', 'CHECK_IN', 'MID_TERM', 'CHECK_OUT'];
@@ -62,7 +62,8 @@ var CLEANS = {
 Object.defineProperty(CLEANS, 'light', { value: CLEANS.standard, enumerable: false });
 Object.defineProperty(CLEANS, 'general', { value: CLEANS.standard, enumerable: false });
 var SEVERITY = { low: 'Low: cosmetic or minor', medium: 'Medium: affects use', high: 'High: needs prompt attention', unsafe: 'Unsafe / emergency' };
-var COND = { excellent: ['Excellent', 'var(--success-fill)', 'var(--success-subtle)', 4], good: ['Good', 'var(--info-fill)', 'var(--info-subtle)', 3], fair: ['Fair', 'var(--warning-fill)', 'var(--warning-subtle)', 2], poor: ['Poor', 'var(--danger-fill)', 'var(--danger-subtle)', 1], na: ['Not inspected', 'var(--border-strong)', 'var(--surface-sunken)', 0] };
+/* condition scale: every item is rated from New to Very poor, or Not applicable */
+var COND = { new: ['New', 'var(--success-fill)', 'var(--success-subtle)', 6], excellent: ['Excellent/Very good', 'var(--success-fill)', 'var(--success-subtle)', 5], good: ['Good', 'var(--info-fill)', 'var(--info-subtle)', 4], fair: ['Fair', 'var(--warning-fill)', 'var(--warning-subtle)', 3], poor: ['Poor', 'var(--danger-fill)', 'var(--danger-subtle)', 2], very_poor: ['Very poor', 'var(--danger-fill)', 'var(--danger-subtle)', 1], na: ['Not applicable', 'var(--border-strong)', 'var(--surface-sunken)', 0] };
 var FIND = { none: 'No change', new: 'New damage', existing: 'Existing', uncertain: 'Uncertain' };
 var WINDOWS = { morning: ['Morning', '08:00', '12:00'], afternoon: ['Afternoon', '12:00', '16:00'], evening: ['Evening', '16:00', '19:00'] };
 function winLabel(w) { if (!w || !w.date) return '—'; var x = WINDOWS[w.slot] || WINDOWS.morning; return fdate(w.date) + ', ' + x[1] + '–' + x[2]; }
@@ -70,9 +71,9 @@ function winStart(w) { return w && w.date ? new Date(w.date + 'T' + (WINDOWS[w.s
 
 var STATUS = {
   SUBMITTED: ['Awaiting quote', 'var(--status-booked)'], NEEDS_INFORMATION: ['More info needed', 'var(--status-awaiting)'], QUOTED: ['Quote ready', 'var(--status-awaiting)'],
-  AWAITING_PAYMENT: ['Awaiting payment', 'var(--status-awaiting)'], READY_FOR_ASSIGNMENT: ['Finding a Pro', 'var(--status-booked)'], SCHEDULED: ['Scheduled', 'var(--status-accepted)'],
-  IN_PROGRESS: ['In progress', 'var(--status-progress)'], ADMIN_REVIEW: ['Report in LISTD review', 'var(--status-progress)'], CORRECTION_REQUIRED: ['Correction required', 'var(--status-disputed)'],
-  CLIENT_REVIEW: ['Ready for your review', 'var(--status-awaiting)'], COMPLETED: ['Completed', 'var(--status-signed)'], ON_HOLD: ['On hold', 'var(--status-disputed)'], CANCELLED: ['Cancelled', 'var(--border-strong)']
+  AWAITING_PAYMENT: ['Awaiting payment', 'var(--status-awaiting)'], READY_FOR_ASSIGNMENT: ['Booked · Finding a Pro', 'var(--status-booked)'], SCHEDULED: ['Accepted', 'var(--status-accepted)'],
+  IN_PROGRESS: ['In progress', 'var(--status-progress)'], ADMIN_REVIEW: ['LISTD review', 'var(--status-progress)'], CORRECTION_REQUIRED: ['Correction required', 'var(--status-disputed)'],
+  CLIENT_REVIEW: ['Ready to approve', 'var(--status-awaiting)'], COMPLETED: ['Approved', 'var(--status-signed)'], ON_HOLD: ['On hold', 'var(--status-disputed)'], CANCELLED: ['Cancelled', 'var(--border-strong)']
 };
 var OPEN_STATES = ['SUBMITTED', 'NEEDS_INFORMATION', 'QUOTED', 'AWAITING_PAYMENT', 'READY_FOR_ASSIGNMENT', 'SCHEDULED', 'IN_PROGRESS', 'ADMIN_REVIEW', 'CORRECTION_REQUIRED', 'CLIENT_REVIEW', 'ON_HOLD'];
 var STARTED = ['IN_PROGRESS', 'ADMIN_REVIEW', 'CORRECTION_REQUIRED', 'CLIENT_REVIEW', 'COMPLETED'];
@@ -86,7 +87,8 @@ var LEVEL_INFO = [null,
 
 /* ---------- policies (Admin-configurable) ---------- */
 var DEFAULT_SETTINGS = {
-  company: { name: 'LISTD Inventory', address: 'Suite 41, 14-15 Triangle South, Clifton, Bristol', phone: '07413065681', email: 'hello@listdinventory.co.uk' },
+  /* no phone number until the LISTD number is confirmed */
+  company: { name: 'LISTD Inventory', address: 'Suite 41, 14-15 Triangle South, Clifton, Bristol', phone: '', email: 'support@listd.co.uk' },
   quoteValidityDays: 7, offerValidityHours: 12, reviewHours: 48, rescheduleHours: 24, proFeePct: 75,
   levels: [{ minJobs: 0, minRating: 0, sharePct: 60 }, { minJobs: 5, minRating: 4.0, sharePct: 65 }, { minJobs: 15, minRating: 4.3, sharePct: 70 }, { minJobs: 25, minRating: 4.5, sharePct: 75 }, { minJobs: 40, minRating: 4.7, sharePct: 80 }],
   repairCategories: ['Plumbing', 'Electrical', 'Appliances', 'Fixtures & decor', 'Other'],
@@ -241,8 +243,9 @@ function evFor(f) { return list('evidence').filter(function (e) { for (var k in 
 
 /* ---------- small UI parts ---------- */
 function isInv(j) { return !!j && svcKey(j) === 'REPAIRS_DAMAGES'; }
-function qWord(j, cap) { var w = isInv(j) ? 'invoice' : 'quote'; return cap ? w.charAt(0).toUpperCase() + w.slice(1) : w; }
-function statusPill(s, j) { var x = STATUS[s] || [s, 'var(--border)']; if (isInv(j) && { SUBMITTED: 1, QUOTED: 1 }[s]) x = [s === 'SUBMITTED' ? 'Being assessed' : 'Invoice ready', x[1]]; if (s === 'QUOTED' && S.role === 'admin') x = [isInv(j) ? 'Invoice sent' : 'Quote sent', x[1]]; return '<span class="ld-pill" style="--c:' + x[1] + '"><i aria-hidden="true"></i>' + esc(x[0]) + '</span>'; }
+/* clients only ever see "quote" (price before work) and "receipt" (money paid); "invoice" is an admin word */
+function qWord(j, cap, forClient) { var w = isInv(j) && !forClient && S.role !== 'client' ? 'invoice' : 'quote'; return cap ? w.charAt(0).toUpperCase() + w.slice(1) : w; }
+function statusPill(s, j) { var x = STATUS[s] || [s, 'var(--border)']; if (isInv(j) && { SUBMITTED: 1, QUOTED: 1 }[s]) x = [s === 'SUBMITTED' ? 'Being assessed' : S.role === 'client' ? 'Quote ready' : 'Invoice ready', x[1]]; if (s === 'CORRECTION_REQUIRED' && S.role === 'client') x = STATUS.ADMIN_REVIEW; if (s === 'QUOTED' && S.role === 'admin') x = [isInv(j) ? 'Invoice sent' : 'Quote sent', x[1]]; return '<span class="ld-pill" style="--c:' + x[1] + '"><i aria-hidden="true"></i>' + esc(x[0]) + '</span>'; }
 function svcTag(j) { var k = SVC[svcKey(j)] || SVC.CHECK_IN; return '<span class="ld-tag" style="--t:' + k.t + ';--tx:' + k.tx + '">' + ic(k.icon, 16) + esc(k.label) + '</span>'; }
 function condChip(c) { var x = COND[c] || COND.na; return '<span class="ld-cond" style="--c:' + x[1] + ';--t:' + x[2] + '">' + x[0] + '</span>'; }
 function badge(text, tone, icon) { return '<span class="ld-badge' + (tone ? ' ld-badge-' + tone : '') + '">' + (icon ? ic(icon, 14) : '') + esc(text) + '</span>'; }

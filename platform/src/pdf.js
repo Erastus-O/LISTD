@@ -14,7 +14,7 @@ function cropImage(src, w, h) {
     im.onerror = function () { res(null); }; im.src = src;
   });
 }
-function companyInfo() { var c = settings().company || {}; return { name: c.name || 'LISTD Inventory', address: c.address || 'Suite 41, 14-15 Triangle South, Clifton, Bristol', phone: c.phone || '07413065681', email: c.email || 'hello@listdinventory.co.uk' }; }
+function companyInfo() { var c = settings().company || {}; return { name: c.name || 'LISTD Inventory', address: c.address || 'Suite 41, 14-15 Triangle South, Clifton, Bristol', phone: c.phone || '', email: c.email || 'support@listd.co.uk' }; }
 
 async function buildInspectionPdf(j, r) {
   var JsPDF = await loadJsPDF();
@@ -71,7 +71,7 @@ async function buildInspectionPdf(j, r) {
   fill(GREEN); doc.rect(0, 0, W, H, 'F');
   fill([255, 255, 255]); doc.rect(13, 13, 177, 88, 'F');
   font('bold', 15); color([84, 196, 120]); doc.text(co.name, 26, 42);
-  [co.address, co.phone, co.email].forEach(function (t, ix) { fill([84, 196, 120]); doc.circle(29.5, 53.5 + ix * 13.3, 3.4, 'F'); font('normal', 6.3); color([40, 40, 40]); doc.text(t, 38, 55.6 + ix * 13.3); });
+  [co.address, co.phone, co.email].filter(Boolean).forEach(function (t, ix) { fill([84, 196, 120]); doc.circle(29.5, 53.5 + ix * 13.3, 3.4, 'F'); font('normal', 6.3); color([40, 40, 40]); doc.text(t, 38, 55.6 + ix * 13.3); });
   var dIso = (j.attendance && j.attendance.inAt) || r.submittedAt || now();
   font('bold', 12); color(CORAL); doc.text(longDate(dIso), W - 13, 62, { align: 'right' });
   var title = ({ INVENTORY: 'Inventory & Schedule of Condition', CHECK_IN: 'Check In & Schedule of Condition', MID_TERM: 'Mid-Term Inspection Report', CHECK_OUT: 'Check Out & Schedule of Condition' })[k] || 'Inventory & Schedule of Condition';
@@ -123,9 +123,9 @@ async function buildInspectionPdf(j, r) {
     tableHead(IC);
     if (!rm.items.length) row([['', CW]], [{ t: 'No items associated with this room.' }], false);
     rm.items.forEach(function (it, ii) {
-      var ref = n + '.' + (ii + 1), ph = ev.filter(function (e) { return e.item === it.id; }), cond = it.condNote || '';
+      var ref = n + '.' + (ii + 1), ph = ev.filter(function (e) { return e.item === it.id; }), cond = condText(it);
       if (comparesK(k) && it.find && it.find !== 'none') cond += (cond ? ' ' : '') + 'Compared with ' + (D.jobs[r.baselineId] ? SVC[svcKey(D.jobs[r.baselineId])].label.toLowerCase() : 'earlier report') + ': ' + FIND[it.find] + '.';
-      var b = bmap[rm.name + '|' + it.name]; if (b && b.condNote) cond += (cond ? '\n\n' : '') + 'At check-in: ' + b.condNote;
+      var b = bmap[rm.name + '|' + it.name]; if (b && condText(b)) cond += (cond ? '\n\n' : '') + 'At check-in: ' + condText(b);
       row(IC, [{ t: ref, style: 'bold', size: 7 }, { t: it.name }, { t: it.desc }, { t: cond, tag: it.action ? ACTIONS[it.action] + ' - Investigate' : '' }], ii % 2 === 0, ph.length > 0);
       photos(ph, ref);
     });

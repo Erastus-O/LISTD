@@ -52,9 +52,9 @@ function anModel(per) {
 }
 function anContrib(d) { var paid = d.N * d.q * d.a * d.p; return paid * (d.arpj * (1 - d.r) * (1 - d.f) - d.c) - d.b; }
 var AN_DRIVERS = [
-  ['N', 'Requests', 'up', 'How many requests clients make.'],
-  ['q', 'Requests quoted', 'up', 'Share of requests that receive a price.'],
-  ['a', 'Quote acceptance', 'up', 'Share of priced requests that clients accept.'],
+  ['N', 'Bookings', 'up', 'How many bookings clients make.'],
+  ['q', 'Bookings quoted', 'up', 'Share of bookings that receive a price.'],
+  ['a', 'Quote acceptance', 'up', 'Share of priced bookings that clients accept.'],
   ['p', 'Payment conversion', 'up', 'Share of accepted quotes that are paid.'],
   ['arpj', 'Average revenue per paid job', 'up', 'Revenue per paid job, excluding tax.'],
   ['r', 'Refund rate', 'down', 'Share of revenue refunded.'],
@@ -74,7 +74,7 @@ function anLevers(m) {
 function anIndicators(k, m) {
   var I = m.ind, h = function (v) { return v == null ? '—' : v < 48 ? Math.round(v * 10) / 10 + ' h' : Math.round(v / 24 * 10) / 10 + ' days'; }, topR = Object.keys(I.reasons).sort(function (a, b) { return I.reasons[b] - I.reasons[a]; })[0];
   return ({
-    N: [['Clients booking', I.clients], ['Repeat clients', I.clients ? I.repeat + ' of ' + I.clients : '—'], ['Cancelled requests', Math.round(I.cancelRate * 100) + '%']],
+    N: [['Clients booking', I.clients], ['Repeat clients', I.clients ? I.repeat + ' of ' + I.clients : '—'], ['Cancelled bookings', Math.round(I.cancelRate * 100) + '%']],
     q: [['Median time to price', h(I.qHrs)], ['Waiting for a price now', list('jobs').filter(function (j) { return j.status === 'SUBMITTED'; }).length]],
     a: [['Declined', I.declined], ['Expired before a decision', I.expired], ['Top decline reason', topR ? '“' + topR + '”' : '—']],
     p: [['Median time from accept to pay', h(I.payHrs)], ['Accepted, not yet paid', list('jobs').filter(function (j) { return j.status === 'AWAITING_PAYMENT'; }).length]],
@@ -99,17 +99,17 @@ function vAdminAnalytics() {
   h += vAnalyticsCharts(per, m);
   h += vAnalyticsOps(per);
   /* funnel, service mix, trend */
-  var fun = [['Requests', m.d.N], ['Priced', m.quoted], ['Accepted', m.accepted], ['Paid', m.paid], ['Completed', m.completed]];
+  var fun = [['Bookings', m.d.N], ['Priced', m.quoted], ['Accepted', m.accepted], ['Paid', m.paid], ['Completed', m.completed]];
   var sv = Object.keys(m.svc).map(function (k) { var x = m.svc[k]; return { label: SVC[k].label, sub: x.n + ' paid · ' + (x.rev ? Math.round(x.c / x.rev * 100) : 0) + '% margin', v: x.c, txt: P(x.c) }; }).sort(function (a, b) { return b.v - a.v; });
   var mk = Object.keys(m.months).sort().slice(-6), tr = mk.map(function (k) { var x = m.months[k]; return { label: MON[+k.slice(5) - 1] + ' ' + k.slice(2, 4), sub: x.n + ' paid', v: x.c, txt: P(x.c) }; });
-  h += '<div class="a-grid two-col"><section class="a-card"><h3>Booking funnel</h3><p class="a-fine">Where requests drop out before they earn anything.</p>' + anBars(fun.map(function (f, i) { return { label: f[0], v: f[1], txt: f[1] + (i ? ' · ' + (fun[i - 1][1] ? Math.round(f[1] / fun[i - 1][1] * 100) : 0) + '%' : '') }; })) + '</section>' +
+  h += '<div class="a-grid two-col"><section class="a-card"><h3>Booking funnel</h3><p class="a-fine">Where bookings drop out before they earn anything.</p>' + anBars(fun.map(function (f, i) { return { label: f[0], v: f[1], txt: f[1] + (i ? ' · ' + (fun[i - 1][1] ? Math.round(f[1] / fun[i - 1][1] * 100) : 0) + '%' : '') }; })) + '</section>' +
     '<section class="a-card"><h3>Contribution by service</h3><p class="a-fine">Which services earn the most after delivery costs.</p>' + anBars(sv) + '</section></div>';
   /* driver tree */
   var nd = function (k, extra) { var x = AN_DRIVERS.filter(function (z) { return z[0] === k; })[0]; return '<div class="an-node"><span class="rk num" title="Impact rank">#' + rank[k] + '</span><b>' + esc(x[1]) + '</b><span class="num">' + anFmt(k, m.d[k]) + '</span>' + (extra || '') + '</div>'; };
   var paidJobs = m.d.N * m.d.q * m.d.a * m.d.p, perJob = m.d.arpj * (1 - m.d.r) * (1 - m.d.f) - m.d.c;
   h += '<section class="a-sec"><h2>How the drivers combine <small class="a-fine">Ranked by impact: #1 gains the most contribution from a 10% improvement</small></h2><div class="an-tree a-card">' +
     '<div class="an-root"><div class="an-node an-top"><b>Contribution</b><span class="num">' + P(m.C) + '</span><small>= Paid jobs × Contribution per job − Rebates</small></div></div>' +
-    '<div class="an-branches"><div class="an-branch"><div class="an-node an-mid"><b>Paid jobs</b><span class="num">' + Math.round(paidJobs) + '</span><small>= Requests × Quoted × Accepted × Paid</small></div><div class="an-leaves">' + nd('N') + nd('q') + nd('a') + nd('p') + '</div></div>' +
+    '<div class="an-branches"><div class="an-branch"><div class="an-node an-mid"><b>Paid jobs</b><span class="num">' + Math.round(paidJobs) + '</span><small>= Bookings × Quoted × Accepted × Paid</small></div><div class="an-leaves">' + nd('N') + nd('q') + nd('a') + nd('p') + '</div></div>' +
     '<div class="an-branch"><div class="an-node an-mid"><b>Contribution per paid job</b><span class="num">' + P(perJob) + '</span><small>= Avg revenue × (1 − Refunds) × (1 − Pro fees) − Direct cost</small></div><div class="an-leaves">' + nd('arpj') + nd('r') + nd('f') + nd('c') + '</div></div>' +
     '<div class="an-branch an-narrow"><div class="an-node an-mid"><b>Less</b><span class="num">' + P(m.rebates) + '</span><small>Taken off the total</small></div><div class="an-leaves">' + nd('b') + '</div></div></div></div></section>';
   h += '<p class="a-fine">Figures use paid jobs booked in the period. Direct costs use the assumptions on the Pricing page; replace them with real payment and support costs as the pilot runs. The ranking is a sensitivity estimate, not a forecast.</p>';
@@ -182,7 +182,7 @@ function vAnalyticsCharts(per, m) {
   var mk = Object.keys(m.months).sort().slice(-6), cats = mk.map(function (k) { return MON[+k.slice(5) - 1] + ' ' + k.slice(2, 4); });
   var cnt = order.map(function (k) { return anJobs(per).filter(function (j) { return svcKey(j) === k; }).length; });
   h += '<section class="a-sec"><h2>Trends</h2><div class="a-grid two-col">' + anColumns('Revenue and contribution by month', 'Paid jobs, by the month they were booked.', cats, [{ name: 'Net revenue', c: 'var(--an-1)', vals: mk.map(function (k) { return m.months[k].rev; }) }, { name: 'Contribution', c: 'var(--an-2)', vals: mk.map(function (k) { return m.months[k].c; }) }], function (v, ax) { return ax ? '£' + Math.round(v / 100) : P(v); }) +
-    anColumns('Requests by service', 'Every request in the period, paid or not.', order.map(function (k) { return SVC[k].label.replace('Repairs & Damages', 'Repairs'); }), [{ name: 'Requests', c: 'var(--an-1)', vals: cnt }], function (v) { return String(Math.round(v)); }, true) + '</div></section>';
+    anColumns('Bookings by service', 'Every booking in the period, paid or not.', order.map(function (k) { return SVC[k].label.replace('Repairs & Maintenance', 'Repairs'); }), [{ name: 'Bookings', c: 'var(--an-1)', vals: cnt }], function (v) { return String(Math.round(v)); }, true) + '</div></section>';
   /* paid vs completed */
   var pj = anJobs(per).filter(function (j) { return paidP(j) > 0; }), pc = { done: 0, open: 0, canc: 0 }, pm = {};
   pj.forEach(function (j) { var st = j.status === 'COMPLETED' ? 'done' : j.status === 'CANCELLED' ? 'canc' : 'open'; pc[st]++; var k = monthKey(j.createdAt), x = pm[k] = pm[k] || { paid: 0, done: 0 }; x.paid++; if (st === 'done') x.done++; });

@@ -8,7 +8,7 @@ function replaceIn(arr, i, obj) { var a = (arr || []).slice(); a[i] = Object.ass
 /* ---- request capture ---- */
 function cmdSubmit(w) {
   var p = D.properties[w.propertyId]; if (!p || p.clientId !== S.clientId) return deny('Choose one of your properties.');
-  if (w.type === 'MAINTENANCE' && !KINDS[w.kind]) return deny('Choose Repairs & Damages or Cleaning.');
+  if (w.type === 'MAINTENANCE' && !KINDS[w.kind]) return deny('Choose Repairs & Maintenance or Cleaning.');
   if (w.type !== 'MAINTENANCE') w.kind = null;
   var key = w.type === 'MAINTENANCE' ? w.kind : w.type, keep = ['access', 'schedNote', 'sched', 'flexDates'].concat(isInspK(key) ? ['rooms', 'keys', 'occupant', 'tenantContact', 'contents', 'sameVisit'] : key === 'CLEANING' ? ['clean', 'condition', 'notes', 'addons', 'carpetRooms', 'areaM2', 'frequency', 'facilities'] : ['category', 'location', 'description', 'severity', 'noPhotoReason', 'repairMode']), scope = {};
   keep.forEach(function (f) { if (w.scope && w.scope[f] != null && w.scope[f] !== '') scope[f] = w.scope[f]; });
@@ -18,10 +18,10 @@ function cmdSubmit(w) {
   var id = uid(), j = { ref: nextRef(), clientId: S.clientId, propertyId: p.id, district: district(p.postcode), type: w.type, kind: w.kind, scope: scope, window: { date: w.date, slot: w.slot },
     propSnapshot: (function () { var r = (w.rooms && w.rooms.pid === p.id) ? w.rooms : {}; return { label: p.label, address: p.address, postcode: p.postcode, type: p.type, bedrooms: r.bedrooms != null ? r.bedrooms : p.bedrooms, bathrooms: r.bathrooms != null ? r.bathrooms : p.bathrooms, kitchens: r.kitchens != null ? r.kitchens : p.kitchens, receptions: r.receptions != null ? r.receptions : p.receptions, furnishing: r.furnishing || p.furnishing, furnishedRooms: r.furnishedRooms != null ? r.furnishedRooms : p.furnishedRooms, area: p.area, outbuildings: p.outbuildings, outdoor: p.outdoor }; })(),
     baselineId: base ? base.id : null, linkedId: w.linkedId || null, status: 'SUBMITTED', quotes: [], payments: [], refunds: [], offers: [], reports: [], disputes: [], changeOrders: [], info: [], createdAt: now(), updatedAt: now(),
-    groupId: w.groupId || null, history: [{ at: now(), role: 'client', text: 'Request submitted' + (comparesK(w.type) ? (base ? '. Baseline: ' + SVC[base.type].label.toLowerCase() + ' ' + base.ref : '. No earlier check-in or inventory on record — comparison unavailable') : '') + (w.groupId ? '. Booked together with other services' : '') }] };
+    groupId: w.groupId || null, history: [{ at: now(), role: 'client', text: 'Booking submitted' + (comparesK(w.type) ? (base ? '. Baseline: ' + SVC[base.type].label.toLowerCase() + ' ' + base.ref : '. No earlier check-in or inventory on record — comparison unavailable') : '') + (w.groupId ? '. Booked together with other services' : '') }] };
   (w.photoIds || []).forEach(function (eid) { patchDoc('evidence', eid, { jobId: id }); });
   setDoc('jobs', id, j);
-  if (!cmdAutoQuote(D.jobs[id])) notify('admin', 'New ' + SVC[svcKey(j)].label + ' request ' + j.ref + ' to quote', id); else notify('admin', 'New ' + SVC[svcKey(j)].label + ' request ' + j.ref + ' (fixed price issued)', id);
+  if (!cmdAutoQuote(D.jobs[id])) notify('admin', 'New ' + SVC[svcKey(j)].label + ' booking ' + j.ref + ' to quote', id); else notify('admin', 'New ' + SVC[svcKey(j)].label + ' booking ' + j.ref + ' (fixed price issued)', id);
   return id;
 }
 /* several services in one booking: one request per service, linked by groupId, each with its own quote or invoice */
@@ -46,7 +46,7 @@ function cmdIssueQuote(j, q, reason) {
   var quotes = (j.quotes || []).map(function (x) { return (x.status === 'ISSUED' || x.status === 'ACCEPTED') ? Object.assign({}, x, { status: 'SUPERSEDED' }) : x; });
   var v = quotes.length + 1; quotes.push(Object.assign({}, q, { v: v, subP: t.sub, totalP: t.total, status: 'ISSUED', issuedAt: now(), expiresAt: addH(now(), (q.validDays || settings().quoteValidityDays) * 24) }));
   upd(j, { quotes: quotes, status: 'QUOTED' }, qWord(j, true) + ' v' + v + (v > 1 ? ' updated and sent: ' : ' issued: ') + P(t.total) + (q.why ? ' (' + q.why + ')' : ''), 'admin');
-  audit('quote.issue', 'job', j.id, reason || 'Quote issued', { v: v, totalP: t.total, proFeeP: q.proFeeP }); notifyJob(j, 'client', j.ref + ': your ' + (v > 1 ? 'updated ' : '') + qWord(j) + ' is ready (' + P(t.total) + ')'); return true;
+  audit('quote.issue', 'job', j.id, reason || 'Quote issued', { v: v, totalP: t.total, proFeeP: q.proFeeP }); notifyJob(j, 'client', j.ref + ': your ' + (v > 1 ? 'updated ' : '') + 'quote is ready (' + P(t.total) + ')'); return true;
 }
 function cmdAcceptQuote(j) {
   var q = curQuote(j); if (!q || q.status !== 'ISSUED' || j.status !== 'QUOTED') return deny('This quote is no longer current.');
@@ -146,7 +146,7 @@ function cmdReleaseReport(j, reason) {
   if (j.status !== 'ADMIN_REVIEW') return false;
   var due = addH(now(), settings().reviewHours), reps = j.reports.map(function (r, i) { return i === j.reports.length - 1 ? Object.assign({}, r, { status: 'RELEASED', releasedAt: now(), reviewDueAt: due }) : (r.status === 'RELEASED' ? Object.assign({}, r, { status: 'SUPERSEDED' }) : r); });
   upd(j, { reports: reps, status: 'CLIENT_REVIEW', reviewDueAt: due }, 'Report v' + reps[reps.length - 1].v + ' released to client. Review window ' + settings().reviewHours + 'h', 'admin');
-  audit('report.release', 'job', j.id, reason || 'Report complete'); notifyJob(j, 'client', j.ref + ': your report is ready to review'); return true;
+  audit('report.release', 'job', j.id, reason || 'Report complete'); notifyJob(j, 'client', j.ref + ': ready to approve. Check the evidence and approve the finished job'); return true;
 }
 function cmdAcceptReport(j, mode) {
   if (j.status !== 'CLIENT_REVIEW') return deny('This report is not awaiting review.');
@@ -185,7 +185,7 @@ function cmdResume(j, reason) { if (j.status !== 'ON_HOLD') return false; var to
 function cmdCancel(j, reason, refundP) {
   if (j.status === 'COMPLETED' || j.status === 'CANCELLED') return deny('This job is closed.');
   var started = !!(j.attendance && j.attendance.inAt), part = { status: 'CANCELLED', cancel: { by: S.role, reason: reason, at: now() } };
-  if (S.role === 'client' && started) return deny('Work has started. Send LISTD a cancellation request instead.');
+  if (S.role === 'client' && started) return deny('Work has started. Ask LISTD to cancel instead.');
   var avail = paidP(j) - refundedP(j); if (refundP == null) refundP = started ? 0 : avail;
   if (refundP > avail) return deny('Refund can’t exceed ' + P(avail) + '.');
   if (refundP > 0) part.refunds = (j.refunds || []).concat([{ id: uid(), amountP: refundP, reason: 'Cancellation: ' + reason, status: 'SUCCEEDED', ref: 'test_rf_' + uid(), at: now() }]);

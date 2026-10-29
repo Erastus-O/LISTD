@@ -4,14 +4,14 @@
    The page hides what a role can't use and refuses those actions; server-side enforcement needs the production backend. */
 var STAFF_ROLES = {
   MAIN: { label: 'Main admin', short: 'Owner', d: 'Owns the LISTD account. Full access, and the only role that can manage staff, roles, policies and ownership.' },
-  SUB: { label: 'Sub-admin', short: 'Sub-admin', d: 'Runs the business day to day: requests, Pros and training, invoicing, finance, disputes and the audit log. Can’t change policies or staff.' },
-  OPS: { label: 'Operations', short: 'Operations', d: 'Runs the work: requests, quotes and invoices, assignments, report reviews, clients and properties. No money movements, Pro approvals, policies or staff.' }
+  SUB: { label: 'Sub-admin', short: 'Sub-admin', d: 'Runs the business day to day: bookings, Pros and training, invoicing, finance, disputes and the audit log. Can’t change policies or staff.' },
+  OPS: { label: 'Operations', short: 'Operations', d: 'Runs the work: bookings, quotes and invoices, assignments, report reviews, clients and properties. No money movements, Pro approvals, policies or staff.' }
 };
 /* which roles can open each Admin section */
 var STAFF_AREAS = [
   ['home', 'Overview & work queues', ['MAIN', 'SUB', 'OPS']],
   ['analytics', 'Analytics: bottom-line drivers', ['MAIN', 'SUB']],
-  ['requests', 'Requests, quotes & job pages', ['MAIN', 'SUB', 'OPS']],
+  ['requests', 'Bookings, quotes & job pages', ['MAIN', 'SUB', 'OPS']],
   ['assign', 'Assignments & calendar', ['MAIN', 'SUB', 'OPS']],
   ['reviews', 'Report reviews', ['MAIN', 'SUB', 'OPS']],
   ['invoicing', 'Invoicing (repairs)', ['MAIN', 'SUB', 'OPS']],

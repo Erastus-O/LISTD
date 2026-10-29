@@ -90,11 +90,11 @@ function modalView() {
     case 'price-code': inner = priceCodeModal(); break;
     case 'staff': inner = staffModal(); break;
     case 'dispute': inner = mShell('m-dispute', j.status === 'COMPLETED' ? 'Raise a complaint' : 'Raise a dispute', '<p class="a-muted">' + (S.role === 'client' ? 'Payout to the Pro is frozen while LISTD reviews.' : 'LISTD will review and contact both parties.') + '</p>' + field('md-cat', 'Category', sel('md-cat', 'category', S.role === 'pro' ? ['Access or safety', 'Scope disagreement', 'Payment', 'Client conduct', 'Other'] : ['Quality of work', 'Report accuracy', 'Missed or late visit', 'Damage', 'Pro conduct', 'Other'], '')) + field('md-t', 'What happened?', area('md-t', 'text', '', 'required')) + photoGrid(evs) + '<div class="a-row">' + upBtn({ jobId: j.id, stage: 'OTHER', area: 'dispute', modal: 1 }, 'Add evidence') + '</div>', 'Open dispute', 'ld-btn-danger'); break;
-    case 'resched': inner = mShell('m-resched', 'Request a new time', '<p class="a-muted">Current: ' + winLabel(j.window) + '. It stays booked until the client and Pro both agree' + (hoursFrom(winStart(j.window)) <= settings().rescheduleHours ? ', and LISTD reviews it because it’s short notice' : '') + '.</p><div class="two">' + field('mr-d', 'New date', inp('mr-d', 'date', '', 'type="date" required min="' + new Date().toISOString().slice(0, 10) + '"')) + field('mr-s', 'Window', sel('mr-s', 'slot', Object.keys(WINDOWS).map(function (k) { return [k, WINDOWS[k][0] + ' ' + WINDOWS[k][1] + '–' + WINDOWS[k][2]]; }), j.window.slot)) + '</div>' + field('mr-r', 'Reason', inp('mr-r', 'reason', '', 'required')), 'Send request'); break;
-    case 'cancel': inner = mShell('m-cancel', 'Cancel this request?', '<p>' + (paidP(j) ? 'Work hasn’t started, so you’ll get a full refund of ' + P(paidP(j) - refundedP(j)) + ' (test mode).' : 'Nothing has been charged.') + '</p>' + field('mc-r', 'Reason', inp('mc-r', 'reason', '', 'required')), 'Cancel request', 'ld-btn-danger'); break;
+    case 'resched': inner = mShell('m-resched', 'Ask for a new time', '<p class="a-muted">Current: ' + winLabel(j.window) + '. It stays booked until the client and Pro both agree' + (hoursFrom(winStart(j.window)) <= settings().rescheduleHours ? ', and LISTD reviews it because it’s short notice' : '') + '.</p><div class="two">' + field('mr-d', 'New date', inp('mr-d', 'date', '', 'type="date" required min="' + new Date().toISOString().slice(0, 10) + '"')) + field('mr-s', 'Window', sel('mr-s', 'slot', Object.keys(WINDOWS).map(function (k) { return [k, WINDOWS[k][0] + ' ' + WINDOWS[k][1] + '–' + WINDOWS[k][2]]; }), j.window.slot)) + '</div>' + field('mr-r', 'Reason', inp('mr-r', 'reason', '', 'required')), 'Send request'); break;
+    case 'cancel': inner = mShell('m-cancel', 'Cancel this booking?', '<p>' + (paidP(j) ? 'Work hasn’t started, so you’ll get a full refund of ' + P(paidP(j) - refundedP(j)) + ' (test mode).' : 'Nothing has been charged.') + '</p>' + field('mc-r', 'Reason', inp('mc-r', 'reason', '', 'required')), 'Cancel booking', 'ld-btn-danger'); break;
     case 'cancel-req': inner = mShell('m-cancel-req', 'Ask LISTD to cancel', '<p class="a-muted">' + (S.role === 'pro' ? 'LISTD will reassign or rearrange the job.' : 'Work has started, so LISTD reviews the outcome and any refund.') + '</p>' + field('mq-r', 'Reason', inp('mq-r', 'reason', '', 'required')), 'Send request'); break;
     case 'q-reject': inner = mShell('m-q-reject', 'Decline this quote?', '<p class="a-muted">LISTD can revise it.</p>' + field('mj-r', 'What would you like changed?', inp('mj-r', 'reason', '')), 'Decline quote'); break;
-    case 'r-correct': inner = mShell('m-correct', 'Request corrections', '<p class="a-muted">The review timer pauses. The Pro updates the report and LISTD releases a new version.</p>' + field('mx-t', 'What needs correcting?', area('mx-t', 'text', '', 'required')), 'Send request'); break;
+    case 'r-correct': inner = mShell('m-correct', 'Ask for corrections', '<p class="a-muted">The review timer pauses. The Pro updates the report and LISTD releases a new version.</p>' + field('mx-t', 'What needs correcting?', area('mx-t', 'text', '', 'required')), 'Send request'); break;
     case 'offer-no': inner = mShell('m-offer-no', 'Decline offer', field('mo-r', 'Reason <small>Optional</small>', inp('mo-r', 'reason', '')), 'Decline offer'); break;
     case 'co-propose': inner = mShell('m-co', 'Propose extra work', '<p class="a-muted">Don’t start extra work until the client approves and pays for it.</p>' + field('mco-d', 'What extra work is needed and why?', area('mco-d', 'desc', '', 'required')) + field('mco-e', 'Your cost estimate £', inp('mco-e', 'estimate', '', 'type="number" min="1" step="0.01" required')) + photoGrid(evs) + '<div class="a-row">' + upBtn({ jobId: j.id, stage: 'OTHER', area: 'change-order', modal: 1 }, 'Add evidence') + '</div>', 'Send to LISTD'); break;
     case 'unsafe': inner = mShell('m-unsafe', 'Stop work: unsafe', '<p class="a-muted">Make the area safe and leave if needed. LISTD will put the job on hold and decide next steps.</p>' + field('mu-r', 'What is unsafe?', area('mu-r', 'reason', '', 'required')), 'Stop & alert LISTD', 'ld-btn-danger'); break;
@@ -211,7 +211,7 @@ document.addEventListener('click', function (e) {
     case 'reveal': S.revealed = S.revealed || {}; S.revealed[id] = 1; audit('property.reveal_access', 'property', id, 'Admin viewed access codes'); render(); break;
     /* client */
     case 'q-accept': cmdAcceptQuote(j); break;
-    case 'inv-pay': if (cmdAcceptQuote(j) && cmdPay(D.jobs[j.id])) toast('Invoice paid (test)'); break;
+    case 'inv-pay': if (cmdAcceptQuote(j) && cmdPay(D.jobs[j.id])) toast('Quote paid (test)'); break;
     case 'q-reject': M('q-reject'); break;
     case 'pay': if (cmdPay(j)) toast('Payment confirmed (test)'); break;
     case 'q-edit': if (!sentQuote(j)) break; S.qEdit = S.qEdit || {}; S.qEdit[id] = 1; if (S.qd) delete S.qd[id]; render(); break;
@@ -230,6 +230,7 @@ document.addEventListener('click', function (e) {
     case 'co-decline': cmdCOReply(j, a.dataset.co, false); break;
     case 'star': S.rate = S.rate || {}; S.rate[id] = +a.dataset.n; render(); break;
     case 'receipt': downloadReceipt(j); break;
+    case 'vat-invoice': downloadReceipt(j, true); break;
     case 'rebate': if (cmdRecordRebate(a.dataset.id, a.dataset.m, +a.dataset.p)) { toast('Rebate recorded (test mode)'); render(); } break;
     case 'dl-report': downloadReport(j); break;
     case 'rv': S.params = Object.assign({}, S.params, { rv: +a.dataset.v }); render(); break;
@@ -240,6 +241,7 @@ document.addEventListener('click', function (e) {
     case 'cond': var d = draftOf(j), it = d.rooms[+a.dataset.r].items[+a.dataset.i]; it.cond = it.cond === a.dataset.c ? '' : a.dataset.c; saveDraft(id); render(); break;
     case 'grade': var dg = draftOf(j), ig = dg.rooms[+a.dataset.r].items[+a.dataset.i]; ig.cond = ig.cond === a.dataset.g ? '' : a.dataset.g; saveDraft(id); render(); break;
     case 'iact': draftOf(j).rooms[+a.dataset.r].items[+a.dataset.i].action = a.dataset.a; saveDraft(id); render(); break;
+    case 'irate': var ir = draftOf(j).rooms[+a.dataset.r].items[+a.dataset.i]; ir.cond = ir.cond === a.dataset.c ? '' : a.dataset.c; saveDraft(id); render(); break;
     case 'vet': var dv = draftOf(j); if (a.dataset.path === 'summary') dv.summaryVetted = true; else { var ks = a.dataset.path.split('.'), o = dv; ks.forEach(function (k2) { o = o[k2]; }); o.vetted = true; o.vettedAt = now(); } saveDraft(id); render(); break;
     case 'rm-item': var dr = draftOf(j); dr.rooms[+a.dataset.r].items.splice(+a.dataset.i, 1); saveDraft(id); render(); break;
     case 'add-row': var da = draftOf(j); da[a.dataset.list].push(a.dataset.list === 'alarms' ? { id: uid(), name: 'Smoke Alarms', location: '', result: '' } : { id: uid(), name: 'Other Keys', desc: '', source: '', vetted: false }); saveDraft(id); render(); break;
