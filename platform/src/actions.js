@@ -10,6 +10,7 @@ function cmdSubmit(w) {
   var p = D.properties[w.propertyId]; if (!p || p.clientId !== S.clientId) return deny('Choose one of your properties.');
   if (w.type === 'MAINTENANCE' && !KINDS[w.kind]) return deny('Choose Repairs & Maintenance or Cleaning.');
   if (w.type !== 'MAINTENANCE') w.kind = null;
+  var cb = coverageBlock(p.postcode, w.type === 'MAINTENANCE' ? w.kind : w.type); if (cb) return deny(cb);
   var key = w.type === 'MAINTENANCE' ? w.kind : w.type, keep = ['access', 'schedNote', 'sched', 'flexDates'].concat(isInspK(key) ? ['rooms', 'keys', 'occupant', 'tenantContact', 'contents', 'sameVisit'] : key === 'CLEANING' ? ['clean', 'condition', 'notes', 'addons', 'carpetRooms', 'areaM2', 'frequency', 'facilities'] : ['category', 'location', 'description', 'severity', 'noPhotoReason', 'repairMode']), scope = {};
   keep.forEach(function (f) { if (w.scope && w.scope[f] != null && w.scope[f] !== '') scope[f] = w.scope[f]; });
   if (w.sched) scope.sched = w.sched; if (w.flexDates) scope.flexDates = w.flexDates;
@@ -74,7 +75,7 @@ function eligible(pro, j, w) {
   if (!pro) return 'No Pro selected';
   if (pro.status !== 'APPROVED') return 'Not approved';
   if ((pro.skills || []).indexOf(svcKey(j)) < 0) return 'Missing ' + SKILLS[svcKey(j)].label + ' skill';
-  var need = requiredLevel(j); if (need && proLevel(pro) < need) return 'Needs Level ' + need + ' (' + LEVEL_INFO[need].name + ')';
+  var role = jobRole(j), need = requiredLevel(j); if (need && proLevel(pro, role) < need) return 'Needs ' + roleBadge(role, need);
   if (!covers(pro, j.district)) return 'Does not cover ' + j.district;
   var exp = (pro.docs || []).filter(function (d) { return d.expires && d.expires < new Date().toISOString().slice(0, 10); }); if (exp.length) return 'Expired document: ' + exp[0].type;
   var day = w && w.date ? new Date(w.date + 'T12:00:00').getDay() : null; if (day != null && pro.availability && pro.availability.days && pro.availability.days.indexOf(day) < 0) return 'Not available that day';
@@ -89,6 +90,17 @@ function cmdOffer(j, proId, w, feeP) {
   var exp = addH(now(), settings().offerValidityHours); if (start && start < exp) exp = start;
   var offers = (j.offers || []).concat([{ id: uid(), proId: proId, window: w, feeP: feeP, status: 'OFFERED', at: now(), expiresAt: exp }]);
   upd(j, { offers: offers }, 'Offered to ' + pro.name + ' for ' + winLabel(w), 'admin'); audit('offer.create', 'job', j.id, 'Offer to ' + pro.name, { feeP: feeP }); notify('p:' + proId, 'New job offer ' + j.ref + ' · ' + P(feeP), j.id); return true;
+}
+/* open jobs: paid jobs with no open offer that a Pro is eligible for in their area. Jobs reach Pros both ways:
+   Pros accept open jobs near them, and LISTD can still send a job straight to a chosen Pro. */
+function openJobsFor(pro) { if (!pro || pro.status !== 'APPROVED') return []; return list('jobs').filter(function (j) { var s = winStart(j.window); return j.status === 'READY_FOR_ASSIGNMENT' && !currentOffer(j) && (!s || hoursFrom(s) > 0) && eligible(pro, j, j.window) === true; }).sort(function (a, b) { return String((a.window || {}).date).localeCompare(String((b.window || {}).date)); }); }
+function openFeeP(j, pro) { var q = acceptedQuote(j); return q && q.proBase ? feeFromBase(q.proBase, proLevel(pro, jobRole(j))) : q ? q.proFeeP || 0 : 0; }
+function cmdTakeOpenJob(j) {
+  var pro = meP(); if (!pro || j.status !== 'READY_FOR_ASSIGNMENT' || currentOffer(j)) return deny('This job is no longer open.');
+  var ok = eligible(pro, j, j.window); if (ok !== true) return deny(ok);
+  var fee = openFeeP(j, pro), offers = (j.offers || []).concat([{ id: uid(), proId: pro.id, window: j.window, feeP: fee, status: 'ACCEPTED', open: true, at: now(), repliedAt: now(), expiresAt: now() }]);
+  upd(j, { offers: offers, proId: pro.id, status: 'SCHEDULED', scheduledAt: now(), agreedFeeP: fee }, pro.name + ' accepted the open job. Scheduled for ' + winLabel(j.window), 'pro');
+  notifyJob(j, 'client admin', j.ref + ': Pro confirmed for ' + winLabel(j.window)); return true;
 }
 function cmdOfferReply(j, accept, reason) {
   var o = currentOffer(j), i = (j.offers || []).indexOf(o);

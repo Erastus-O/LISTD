@@ -851,6 +851,12 @@ select.a-mini[data-staffrole] { min-width: 150px; }
 .a-feeparts td{padding:5px 0;border-bottom:1px solid var(--border);vertical-align:top}
 .a-feeparts td.r{text-align:right;white-space:nowrap;padding-left:12px;font-variant-numeric:tabular-nums}
 .a-feeparts tr.tot td{font-weight:700;border-bottom:0}
+/* Pro roles: one level badge per role, and services grouped by role in onboarding */
+.a-rolebar { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.a-rolegrp { display: grid; gap: 6px; padding: 10px 0; border-top: 1px solid var(--border); }
+.a-rolegrp:first-of-type { border-top: 0; padding-top: 0; }
+.a-pdlevel + .a-pdlevel { border-top: 1px solid var(--border); padding-top: 16px; margin-top: 16px; }
+.ld-rail b small { display: block; font-weight: 500; color: var(--text-muted); }
 
 body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans)}
 </style>
@@ -939,20 +945,42 @@ var STATUS = {
 };
 var OPEN_STATES = ['SUBMITTED', 'NEEDS_INFORMATION', 'QUOTED', 'AWAITING_PAYMENT', 'READY_FOR_ASSIGNMENT', 'SCHEDULED', 'IN_PROGRESS', 'ADMIN_REVIEW', 'CORRECTION_REQUIRED', 'CLIENT_REVIEW', 'ON_HOLD'];
 var STARTED = ['IN_PROGRESS', 'ADMIN_REVIEW', 'CORRECTION_REQUIRED', 'CLIENT_REVIEW', 'COMPLETED'];
-/* Pro levels. Levels 1-3 are cleaning; Levels 4-5 add inspections and pay more. Repairs & Damages is a trade skill approved separately, outside the levels. */
-var LEVEL_INFO = [null,
-  { name: 'Cleaner', unlocks: 'Standard home cleans' },
-  { name: 'Experienced cleaner', unlocks: 'Standard, End of Tenancy and Office cleans' },
-  { name: 'Senior cleaner', unlocks: 'All cleans, including Deep cleans' },
-  { name: 'Inspector', unlocks: 'Check-in and check-out inspections (up to 3 bedrooms), plus all cleans' },
-  { name: 'Senior inspector', unlocks: 'Inspections on every property size, including 4+ bedrooms, plus all cleans' }];
+/* Pro roles. A Pro can hold more than one: the roles follow the services they deliver.
+   Every role has three levels, unlocked by completed jobs and ratings in that role. Badge: "Pro Clerk · Level 3". */
+var ROLES = {
+  CLERK: { label: 'Pro Clerk', short: 'Clerk', icon: 'inventory', skills: ['INVENTORY', 'CHECK_IN', 'MID_TERM', 'CHECK_OUT'], unlocks: [null, 'Inspections up to 2 bedrooms', 'Inspections up to 4 bedrooms', 'Inspections on every property size'] },
+  CLEANER: { label: 'Pro Cleaner', short: 'Cleaner', icon: 'cleaning', skills: ['CLEANING'], unlocks: [null, 'Standard home cleans', 'Standard, End of Tenancy and Office cleans', 'All cleans, including Deep cleans'] },
+  TRADES: { label: 'Pro Trades', short: 'Trades', icon: 'settings', skills: ['REPAIRS_DAMAGES'], unlocks: [null, 'Repairs and maintenance', 'Repairs and maintenance, higher rate', 'Repairs and maintenance, top rate'] }
+};
+var ROLE_KEYS = ['CLERK', 'CLEANER', 'TRADES'];
+function roleOfSkill(k) { return k === 'CLEANING' ? 'CLEANER' : k === 'REPAIRS_DAMAGES' ? 'TRADES' : 'CLERK'; }
+function jobRole(j) { return roleOfSkill(svcKey(j)); }
+function proRoles(p) { var s = (p && p.skills) || []; return ROLE_KEYS.filter(function (r) { return ROLES[r].skills.some(function (k) { return s.indexOf(k) >= 0; }); }); }
+/* records from before roles kept one level from 1 to 5 (1-3 cleaning, 4-5 inspections) */
+function legacyRoleLevel(p, role) { var l = +(p.level || p.levelOverride || 1) || 1; return role === 'CLEANER' ? Math.min(3, l) : role === 'CLERK' ? (l >= 5 ? 3 : l >= 4 ? 2 : 1) : 1; }
+/* a Pro's level in one role; with no role, their highest level across the roles they hold */
+function proLevel(p, role) {
+  if (!p) return 1;
+  if (!role) return proRoles(p).reduce(function (a, r) { return Math.max(a, proLevel(p, r)); }, 1);
+  var l = p.levels && p.levels[role] != null ? +p.levels[role] : legacyRoleLevel(p, role); return Math.min(3, Math.max(1, l || 1));
+}
+function roleBadge(role, lv) { return ROLES[role].label + ' · Level ' + lv; }
+/* standards check: a Pro's first jobs in each role get a closer LISTD review */
+function standardsJobs() { return Math.max(0, +settings().standardsJobs || 5); }
+function roleJobs(proId, role) { return list('jobs').filter(function (j) { return j.proId === proId && jobRole(j) === role; }); }
+function standardsCheck(p, role) {
+  var n = standardsJobs(), done = roleJobs(p.id, role).filter(function (j) { return j.status === 'COMPLETED'; }).length, early = (p.standards || {})[role], passed = !!early || done >= n;
+  return { n: n, done: Math.min(done, n), passed: passed, early: early || null, label: passed ? 'Standards check passed' : 'New to LISTD · job ' + Math.min(n, done + 1) + ' of ' + n };
+}
+function newBadge(p, role) { return standardsCheck(p, role).passed ? '' : badge('New to LISTD', 'info'); }
 
 /* ---------- policies (Admin-configurable) ---------- */
 var DEFAULT_SETTINGS = {
   /* no phone number until the LISTD number is confirmed */
   company: { name: 'LISTD Inventory', address: 'Suite 41, 14-15 Triangle South, Clifton, Bristol', phone: '', email: 'support@listd.co.uk' },
   quoteValidityDays: 7, offerValidityHours: 12, reviewHours: 48, rescheduleHours: 24, proFeePct: 75,
-  levels: [{ minJobs: 0, minRating: 0, sharePct: 60 }, { minJobs: 5, minRating: 4.0, sharePct: 65 }, { minJobs: 15, minRating: 4.3, sharePct: 70 }, { minJobs: 25, minRating: 4.5, sharePct: 75 }, { minJobs: 40, minRating: 4.7, sharePct: 80 }],
+  /* what a Pro needs, in the role, before applying for each level; placeholders to confirm */
+  roleLevels: [{ minJobs: 0, minRating: 0 }, { minJobs: 10, minRating: 4.5 }, { minJobs: 30, minRating: 4.7 }], standardsJobs: 5,
   repairCategories: ['Plumbing', 'Electrical', 'Appliances', 'Fixtures & decor', 'Other'],
   guide: { INVENTORY: { base: 9000, bed: 1500 }, CHECK_IN: { base: 5500, bed: 1000 }, MID_TERM: { base: 5000, bed: 800 }, CHECK_OUT: { base: 5500, bed: 1000 }, light: { base: 6000, bed: 1500, bath: 1000 }, general: { base: 9000, bed: 2500, bath: 1500 }, deep: { base: 14000, bed: 4000, bath: 2500 } }
 };
@@ -981,14 +1009,13 @@ function currentOffer(j) { return (j.offers || []).filter(function (o) { return 
 function latestReport(j) { return (j.reports || []).slice(-1)[0] || null; }
 function releasedReport(j) { return (j.reports || []).filter(function (r) { return r.status === 'RELEASED'; }).slice(-1)[0] || null; }
 
-function proLevel(p) { var l = p ? +(p.level || p.levelOverride || 1) : 1; return Math.min(5, Math.max(1, l || 1)); }
 function proStats(proId) {
   var jobs = list('jobs').filter(function (j) { return j.proId === proId; });
   var done = jobs.filter(function (j) { return j.status === 'COMPLETED'; }), rated = done.filter(function (j) { return j.rating && !j.rating.hidden; });
-  var n = done.length, pr = D.pros[proId], lv = proLevel(pr);
+  var n = done.length, pr = D.pros[proId], lv = proLevel(pr), roles = proRoles(pr);
   var paid = 0, payable = 0, pending = 0;
   jobs.forEach(function (j) { var s = settlement(j); if (s.status === 'PAID') paid += s.amountP; else if (s.status === 'ELIGIBLE') payable += s.amountP; else if (s.status === 'BLOCKED') pending += s.amountP; });
-  return { completed: n, level: lv, levelName: LEVEL_INFO[lv].name, rating: rated.length ? rated.reduce(function (a, j) { return a + j.rating.score; }, 0) / rated.length : null, ratings: rated.length, paid: paid, payable: payable, pending: pending, active: jobs.filter(function (j) { return ['SCHEDULED', 'IN_PROGRESS', 'CORRECTION_REQUIRED'].indexOf(j.status) >= 0; }).length };
+  return { completed: n, level: lv, roles: roles, levelName: roles.map(function (r) { return roleBadge(r, proLevel(pr, r)); }).join(', ') || 'No role yet', rating: rated.length ? rated.reduce(function (a, j) { return a + j.rating.score; }, 0) / rated.length : null, ratings: rated.length, paid: paid, payable: payable, pending: pending, active: jobs.filter(function (j) { return ['SCHEDULED', 'IN_PROGRESS', 'CORRECTION_REQUIRED'].indexOf(j.status) >= 0; }).length };
 }
 
 /* ---------- report templates ---------- */
@@ -1114,7 +1141,9 @@ function badge(text, tone, icon) { return '<span class="ld-badge' + (tone ? ' ld
 function payLabel(j) { var p = paidP(j), r = refundedP(j); return !p ? 'Not paid' : r >= p ? 'Refunded' : r ? 'Part refunded' : 'Paid'; }
 function payBadge(j) { var l = payLabel(j); return badge(l, l === 'Paid' ? 'success' : l === 'Not paid' ? '' : 'info', 'pound'); }
 function setBadge(j) { var s = settlement(j); return s.status === 'PAID' ? badge('Pro paid ' + P(s.amountP), 'success', 'escrow') : s.status === 'ELIGIBLE' ? badge('Payout eligible ' + P(s.amountP), 'brand', 'escrow') : s.status === 'BLOCKED' ? badge('Payout blocked', 'warning', 'escrow') : ''; }
-function levelBar(lv, name) { var s = ''; for (var i = 1; i <= 5; i++) s += '<i class="' + (i <= lv ? 'on' : '') + '"></i>'; return '<span class="ld-level"><span aria-hidden="true">' + s + '</span>Level ' + lv + ' · ' + esc(name) + '</span>'; }
+function levelBar(lv, text) { var s = ''; for (var i = 1; i <= 3; i++) s += '<i class="' + (i <= lv ? 'on' : '') + '"></i>'; return '<span class="ld-level"><span aria-hidden="true">' + s + '</span>' + esc(text) + '</span>'; }
+/* one badge per role the Pro holds, e.g. "Pro Clerk · Level 3", plus "New to LISTD" during the standards check */
+function roleBars(p) { var r = proRoles(p); return r.length ? r.map(function (x) { var l = proLevel(p, x); return '<span class="a-rolebar">' + levelBar(l, roleBadge(x, l)) + newBadge(p, x) + '</span>'; }).join(' ') : '<span class="a-fine">No role yet</span>'; }
 function initials(n) { return String(n || '?').split(/\s+/).map(function (w) { return w[0] || ''; }).join('').slice(0, 2).toUpperCase(); }
 function avatar(n, verified, size) { return '<span class="ld-avatar' + (size ? ' ld-avatar-' + size : '') + '"><span role="img" aria-label="' + esc(n) + '">' + esc(initials(n)) + '</span>' + (verified ? '<span class="v" title="Verified Pro">' + ic('check', 10) + '</span>' : '') + '</span>'; }
 function stars(n) { var s = ''; for (var i = 1; i <= 5; i++) s += '<span aria-hidden="true" style="color:' + (i <= Math.round(n) ? 'var(--live)' : 'var(--border-strong)') + '">★</span>'; return '<span title="' + (n ? n.toFixed(1) : 'No ratings') + ' out of 5"><span class="sr-only">' + (n ? n.toFixed(1) + ' out of 5' : 'No ratings') + '</span>' + s + '</span>'; }
@@ -1126,7 +1155,7 @@ function jobRow(j, who) {
   if (j.window && j.window.date) sub.push(winLabel(j.window));
   if (who === 'admin' || who === 'pro') { var c = D.clients[j.clientId]; if (c && who === 'admin') sub.push(esc(c.orgName || c.name)); }
   if (who !== 'pro' && j.proId && D.pros[j.proId]) sub.push('Pro: ' + esc(D.pros[j.proId].name));
-  var q = curQuote(j), right = who === 'pro' ? (currentOffer(j) && currentOffer(j).proId === S.proId ? P(currentOffer(j).feeP) : j.proId === S.proId ? P(proFeeP(j)) : '') : q ? P(q.totalP) : '';
+  var q = curQuote(j), right = who === 'pro' ? (currentOffer(j) && currentOffer(j).proId === S.proId ? P(currentOffer(j).feeP) : j.proId === S.proId ? P(proFeeP(j)) : !j.proId && j.status === 'READY_FOR_ASSIGNMENT' ? P(openFeeP(j, D.pros[S.proId])) : '') : q ? P(q.totalP) : '';
   var flag = openDispute(j) ? badge('Dispute open', 'danger', 'flag') : '';
   return '<button class="a-job" type="button" data-act="open-job" data-id="' + j.id + '" style="--c:' + k.c + '"><span class="bar"></span><span class="t"><span class="a-row" style="gap:8px">' + svcTag(j) + (j.scope && j.scope.clean ? badge(CLEANS[j.scope.clean].label) : '') + flag + '</span><b>' + esc(p.label || p.address || 'Property') + (p.postcode ? ', ' + esc(p.postcode) : '') + '</b><span>' + sub.join(' · ') + '</span></span><span class="r">' + statusPill(j.status, j) + '<span class="price">' + right + '</span></span></button>';
 }
@@ -1160,19 +1189,26 @@ var FURNISH = { unfurnished: 'Unfurnished', part: 'Part-furnished', furnished: '
 var REPORT_DUE = { INVENTORY: 'Report within 2 working days of the visit', CHECK_IN: 'Report within 1 working day of the visit', MID_TERM: 'Report within 2 working days of the visit', CHECK_OUT: 'Report within 2 working days of the visit', CLEANING: 'Before-and-after photos on the day', REPAIRS_DAMAGES: 'Completion photos and notes on the day' };
 var CLEAN_ADDONS = { oven: 'Oven clean', fridge: 'Fridge and freezer inside', cupboards: 'Inside cupboards', carpets: 'Carpet clean (per room)', windowsOut: 'Exterior windows' };
 var DEFAULT_PRICING = {
-  area: 'Bristol',
+  area: 'Bristol and Birmingham',
   rates: { INVENTORY: [8500, 10000, 12000, 14000, 16000], CHECK_IN: [6000, 6000, 6500, 7000, 7500], COMBO: [11000, 12500, 14500, 16500, 18500], CHECK_OUT: [7500, 9000, 11000, 13000, 15000], MID_TERM: [6000, 6500, 7500, 8500, 9500] },
   furnish: { part: 1000, furnishedSmall: 2000, furnishedLarge: 3000 },
   extraRoomP: 1000, outbuildingP: 1500, outdoorP: 1500,
   sched: { flexOffP: 1000, priorityP: 3000, priorityProP: 2000, flexDays: 5, standardDays: 2, priorityDays: 2, flexOpen: false, priorityOpen: true },
   floor: { minP: 2500, pct: 25 },
   costs: { payPct: 1.5, payFixedP: 20, opsP: 500, reworkPct: 3 },
-  pro: { attendP: 1000, furnishSharePct: 50, rateByLevel: [1400, 1500, 1600, 2000, 2200], minutes: { INVENTORY: [75, 30], CHECK_IN: [45, 5], CHECK_IN_COMBO: [40, 5], MID_TERM: [45, 10], CHECK_OUT: [65, 25] } },
+  /* hourly rate for each role and level, set by LISTD (placeholders to confirm) */
+  pro: { attendP: 1000, furnishSharePct: 50, rates: { CLERK: [1800, 2000, 2200], CLEANER: [1400, 1500, 1600], TRADES: [2000, 2300, 2600] }, minutes: { INVENTORY: [75, 30], CHECK_IN: [45, 5], CHECK_IN_COMBO: [40, 5], MID_TERM: [45, 10], CHECK_OUT: [65, 25] } },
   clean: { hourP: 2600, consumablesP: 800, kitP: 500, spreadPct: 15, hours: { standard: [1.5, 0.75, 0.5], deep: [3, 1.5, 1], eot: [3.5, 1.5, 1] }, officeM2PerHour: 60, officeMinH: 2, cond: { 'vacant-tidy': 1, 'vacant-dirty': 1.25, occupied: 1.1 }, minP: { standard: 6000, deep: 11000, eot: 12000, office: 6000 }, addons: { oven: 3500, fridge: 1500, cupboards: 2000, carpets: 2500 }, addonH: { oven: 1, fridge: 0.5, cupboards: 0.75, carpets: 0.75 } },
   repairs: { diagnosisP: 5000, diagnosisProP: 2500, labourProPct: 75 },
   rebate: { tier1: 10, pct: 5, tier2: 25 },
   taxPct: 0
 };
+/* coverage: Bristol and the South West get every service; Birmingham has cleaning now, with inspections and repairs coming soon.
+   Bristol and Birmingham share prices (London later). Areas are postcode areas, e.g. BS, BA, B. */
+var COVERAGE = { ALL: ['BS', 'BA', 'GL', 'SN', 'TA', 'EX', 'TQ', 'PL', 'TR', 'DT', 'BH', 'SP'], CLEANING: ['B'] };
+function pcArea(pc) { var m = String(pc || '').trim().toUpperCase().match(/^[A-Z]+/); return m ? m[0] : ''; }
+function coverageFor(pc) { var a = pcArea(pc); return COVERAGE.ALL.indexOf(a) >= 0 ? 'ALL' : COVERAGE.CLEANING.indexOf(a) >= 0 ? 'CLEANING' : ''; }
+function coverageBlock(pc, key) { var c = coverageFor(pc); if (c === 'ALL' || (c === 'CLEANING' && key === 'CLEANING')) return ''; return c === 'CLEANING' ? 'In Birmingham we offer cleaning now. ' + SVC[key].label + ' is coming soon.' : 'LISTD isn’t in ' + (pcArea(pc) || 'this area') + ' yet. We cover Bristol, the South West and Birmingham, and we’re coming to your area soon.'; }
 function pricing() { var s = (D.settings || {}).pricing || {}, d = DEFAULT_PRICING, o = {}; Object.keys(d).forEach(function (k) { o[k] = s[k] == null ? d[k] : (typeof d[k] === 'object' && !Array.isArray(d[k]) ? Object.assign({}, d[k], s[k]) : s[k]); }); return o; }
 function pounds(p) { return '£' + Math.round(p / 100); }
 function sizeIdx(beds) { beds = Math.max(0, Math.round(+beds || 0)); return beds >= 5 ? -1 : beds; }
@@ -1196,15 +1232,18 @@ function schedLine(mode) { var s = pricing().sched; return mode === 'priority' ?
 function furnishAdj(furn, beds) { var f = pricing().furnish; if (furn === 'part') return f.part; if (furn === 'furnished') return (+beds || 0) >= 3 ? f.furnishedLarge : f.furnishedSmall; return 0; }
 /* expected internal floor area for a size; much larger properties are reviewed before pricing */
 function areaUnusual(prop) { var a = +prop.area || 0, b = Math.max(0, +prop.bedrooms || 0); return a > 0 && a > (40 + 30 * b) * 1.5; }
-function proRate(level) { var r = pricing().pro.rateByLevel; return r[Math.min(5, Math.max(1, level || 4)) - 1]; }
+function proRate(role, level) { var r = (pricing().pro.rates || DEFAULT_PRICING.pro.rates)[role] || DEFAULT_PRICING.pro.rates[role] || DEFAULT_PRICING.pro.rates.CLERK; return r[Math.min(3, Math.max(1, level || 1)) - 1]; }
+/* the role and level a quote's workload was priced at; older quotes stored a level from 1 to 5 */
+function baseRole(b) { return b.role || (+b.level >= 4 ? 'CLERK' : 'CLEANER'); }
+function baseLevel(b) { return b.role ? +b.level || 1 : legacyRoleLevel({ level: b.level }, baseRole(b)); }
 function minutesFor(key, beds) { var m = pricing().pro.minutes[key] || [60, 10]; return m[0] + m[1] * Math.max(0, +beds || 0); }
 /* Pro fees are rounded to the nearest 50p so every offer reads as a clean figure */
-function feeFromBase(b, level) { if (!b) return 0; return Math.round(((b.attendP || 0) + (b.minutes || 0) / 60 * proRate(level || b.level) + (b.allowP || 0)) / 50) * 50; }
+function feeFromBase(b, level) { if (!b) return 0; return Math.round(((b.attendP || 0) + (b.minutes || 0) / 60 * proRate(baseRole(b), level || baseLevel(b)) + (b.allowP || 0)) / 50) * 50; }
 /* how a Pro fee is built, line by line, for the Pro and for LISTD */
 function feeParts(b, level) {
-  if (!b) return []; level = level || b.level; var r = proRate(level), out = [], m = b.minutes || 0;
+  if (!b) return []; level = level || baseLevel(b); var r = proRate(baseRole(b), level), out = [], m = b.minutes || 0;
   if (b.attendP) out.push([b.kitOnly ? 'Kit allowance' : 'Attendance allowance', b.attendP]);
-  if (m) out.push(['Expected time: ' + ((m >= 60 ? Math.floor(m / 60) + 'h ' : '') + (m % 60 ? m % 60 + 'm' : '')).trim() + ' at ' + P(r) + '/h (Level ' + level + ')', Math.round(m / 60 * r)]);
+  if (m) out.push(['Expected time: ' + ((m >= 60 ? Math.floor(m / 60) + 'h ' : '') + (m % 60 ? m % 60 + 'm' : '')).trim() + ' at ' + P(r) + '/h (' + roleBadge(baseRole(b), level) + ')', Math.round(m / 60 * r)]);
   (b.allow || []).forEach(function (a) { out.push([a[0], a[1]]); });
   if (!b.allow && b.allowP) out.push(['Complexity and urgency allowances', b.allowP]);
   var sum = out.reduce(function (a, x) { return a + x[1]; }, 0), fee = feeFromBase(b, level); if (fee !== sum) out.push(['Rounding to the nearest 50p', fee - sum]);
@@ -1226,13 +1265,14 @@ function priceInspection(k, prop, o) {
   var allow = 0, items = [], extra = Math.max(0, (+prop.bathrooms || 1) - 1) + Math.max(0, (+prop.kitchens || 1) - 1) + Math.max(0, +prop.receptions || 0);
   if (!comboCI) {
     var fa = furnishAdj(prop.furnishing, beds); if (fa) { lines.push(L('Furnishing: ' + FURNISH[prop.furnishing].toLowerCase(), fa)); allow += fa * pr.pro.furnishSharePct / 100; items.push(['Furnishing allowance (' + FURNISH[prop.furnishing].toLowerCase() + ')', Math.round(fa * pr.pro.furnishSharePct / 100)]); }
-    if (extra) { lines.push(L('Additional bathroom, kitchen or reception room', pr.extraRoomP, 'svc', extra)); allow += extra * pr.extraRoomP / 2; items.push(['Extra rooms allowance (' + extra + ')', Math.round(extra * pr.extraRoomP / 2)]); }
+    /* every extra room is its own visible line */
+    if (extra) { [['Extra bathroom', Math.max(0, (+prop.bathrooms || 1) - 1)], ['Extra kitchen', Math.max(0, (+prop.kitchens || 1) - 1)], ['Extra reception room', Math.max(0, +prop.receptions || 0)]].forEach(function (x) { for (var e = 1; e <= x[1]; e++) lines.push(L(x[0] + (x[1] > 1 ? ' ' + e : ''), pr.extraRoomP)); }); allow += extra * pr.extraRoomP / 2; items.push(['Extra rooms allowance (' + extra + ')', Math.round(extra * pr.extraRoomP / 2)]); }
     if (prop.outbuildings) { lines.push(L('Outbuildings', pr.outbuildingP)); allow += pr.outbuildingP / 2; items.push(['Outbuildings allowance', Math.round(pr.outbuildingP / 2)]); }
-    if (prop.outdoor) { lines.push(L('Extensive outdoor areas', pr.outdoorP)); allow += pr.outdoorP / 2; items.push(['Outdoor areas allowance', Math.round(pr.outdoorP / 2)]); }
+    if (prop.outdoor) { lines.push(L('Large outdoor area', pr.outdoorP)); allow += pr.outdoorP / 2; items.push(['Outdoor areas allowance', Math.round(pr.outdoorP / 2)]); }
     var sl = schedLine(o.sched); if (sl) { lines.push(sl); if (o.sched === 'priority') { allow += pr.sched.priorityProP; items.push(['Priority allowance', pr.sched.priorityProP]); } }
   }
   var mins = minutesFor(comboCI ? 'CHECK_IN_COMBO' : k, beds);
-  return { lines: lines, proBase: { attendP: comboCI ? 0 : pr.pro.attendP, minutes: mins, allowP: Math.round(allow), allow: items, level: 4 }, durationMin: Math.round(mins / 15) * 15, why: '' };
+  return { lines: lines, proBase: { attendP: comboCI ? 0 : pr.pro.attendP, minutes: mins, allowP: Math.round(allow), allow: items, role: 'CLERK', level: beds <= 2 ? 1 : beds <= 4 ? 2 : 3 }, durationMin: Math.round(mins / 15) * 15, why: '' };
 }
 
 /* ---- cleaning: preliminary estimate, then a fixed approved quote ---- */
@@ -1253,7 +1293,7 @@ function priceCleaning(prop, sc, o) {
   var sl = schedLine(o.sched); if (sl) lines.push(sl);
   var sub = lines.reduce(function (a, l) { return a + l.q * l.u; }, 0), sp = c.spreadPct / 100;
   return { lines: lines, hours: h, estLowP: Math.floor(sub * (1 - sp) / 500) * 500, estHighP: Math.ceil(sub * (1 + sp) / 500) * 500, needsQuote: (sc.addons || []).indexOf('windowsOut') >= 0 || t === 'office',
-    proBase: { attendP: c.kitP, kitOnly: true, minutes: Math.round(h * 60), allowP: o.sched === 'priority' ? pricing().sched.priorityProP : 0, allow: o.sched === 'priority' ? [['Priority allowance', pricing().sched.priorityProP]] : [], level: t === 'deep' ? 3 : t === 'standard' ? 1 : 2 }, durationMin: Math.round(h * 60 / 15) * 15 };
+    proBase: { attendP: c.kitP, kitOnly: true, minutes: Math.round(h * 60), allowP: o.sched === 'priority' ? pricing().sched.priorityProP : 0, allow: o.sched === 'priority' ? [['Priority allowance', pricing().sched.priorityProP]] : [], role: 'CLEANER', level: t === 'deep' ? 3 : t === 'standard' ? 1 : 2 }, durationMin: Math.round(h * 60 / 15) * 15 };
 }
 
 /* ---- repairs: fixed task price where the scope is known; a paid diagnosis where it isn't ---- */
@@ -1367,7 +1407,7 @@ function vAdminPricing() {
     '<h3>One complexity adjustment</h3><div class="a-prg">' + field('pr-fp', 'Part-furnished (£)', gp('f_part', pr.furnish.part)) + field('pr-fs', 'Furnished, studio–2 bed (£)', gp('f_small', pr.furnish.furnishedSmall)) + field('pr-fl', 'Furnished, 3–4 bed (£)', gp('f_large', pr.furnish.furnishedLarge)) + field('pr-xr', 'Each extra bathroom, kitchen or reception (£)', gp('x_room', pr.extraRoomP)) + field('pr-ob', 'Outbuildings (£)', gp('x_out', pr.outbuildingP)) + field('pr-od', 'Extensive outdoor areas (£)', gp('x_outdoor', pr.outdoorP)) + '</div><p class="a-fine">Included: the selected bedrooms, one kitchen, one bathroom, one living room and ordinary hallways. Heavily furnished, 5+ bedrooms and unusually large properties go to a custom quote. No per-bedroom fee on top of the size price.</p>' +
     '<h3>Scheduling options</h3><div class="a-prg">' + field('pr-po', 'Priority premium (£)', gp('s_pri', pr.sched.priorityP)) + field('pr-pp', 'Of which to the Pro (£)', gp('s_pripro', pr.sched.priorityProP)) + field('pr-pd', 'Priority: dates within (working days)', n('s_prid', pr.sched.priorityDays), 'Later dates are Standard.') + '</div>' +
     '<label class="a-check"><input type="checkbox" name="s_priOpen"' + (pr.sched.priorityOpen ? ' checked' : '') + '> Offer Priority now <span class="a-fine">Turn off when Pro capacity isn’t there</span></label>' +
-    '<h3>Pro fees from workload</h3><p class="a-fine">Pro fee = attendance allowance + expected on-site and reporting time × the Pro’s hourly rate + approved complexity and urgency allowances. The fee is agreed before the Pro accepts.</p><div class="a-prg">' + field('pr-at', 'Attendance allowance (£)', gp('p_att', pr.pro.attendP)) + field('pr-fsh', 'Pro share of complexity adjustments (%)', n('p_fsh', pr.pro.furnishSharePct)) + [1, 2, 3, 4, 5].map(function (l) { return field('pr-rl' + l, 'Level ' + l + ' hourly rate (£)', gp('p_rate_' + l, pr.pro.rateByLevel[l - 1])); }).join('') + '</div>' +
+    '<h3>Pro fees from workload</h3><p class="a-fine">Pro fee = attendance allowance + expected on-site and reporting time × the Pro’s hourly rate + approved complexity and urgency allowances. The fee is agreed before the Pro accepts.</p><div class="a-prg">' + field('pr-at', 'Attendance allowance (£)', gp('p_att', pr.pro.attendP)) + field('pr-fsh', 'Pro share of complexity adjustments (%)', n('p_fsh', pr.pro.furnishSharePct)) + ROLE_KEYS.map(function (r) { return [1, 2, 3].map(function (l) { return field('pr-rl-' + r + l, roleBadge(r, l) + ' hourly rate (£)', gp('p_rate_' + r + '_' + l, proRate(r, l))); }).join(''); }).join('') + '</div>' +
     '<div class="a-tw"><table><thead><tr><th>Expected minutes (on site + report)</th><th>Base</th><th>Each bedroom</th></tr></thead><tbody>' + [['INVENTORY', 'Inventory & Condition'], ['CHECK_IN', 'Standalone check-in'], ['CHECK_IN_COMBO', 'Check-in in the same visit'], ['MID_TERM', 'Mid-term'], ['CHECK_OUT', 'Check-out']].map(function (x) { var m = pr.pro.minutes[x[0]]; return '<tr><td class="sub">' + x[1] + '</td><td>' + n('m_' + x[0] + '_0', m[0]) + '</td><td>' + n('m_' + x[0] + '_1', m[1]) + '</td></tr>'; }).join('') + '</tbody></table></div>' +
     '<h3>Cleaning</h3><div class="a-prg">' + field('pr-ch', 'Client price per cleaner-hour (£)', gp('c_hour', pr.clean.hourP)) + field('pr-cc', 'Equipment and consumables (£)', gp('c_cons', pr.clean.consumablesP)) + field('pr-ck', 'Pro kit allowance (£)', gp('c_kit', pr.clean.kitP)) + field('pr-cs', 'Estimate range (±%)', n('c_spread', pr.clean.spreadPct)) + Object.keys(pr.clean.minP).map(function (t) { return field('pr-cm-' + t, 'Minimum · ' + CLEANS[t].label + ' (£)', gp('c_min_' + t, pr.clean.minP[t])); }).join('') + Object.keys(pr.clean.addons).map(function (a) { return field('pr-ca-' + a, CLEAN_ADDONS[a] + ' (£)', gp('c_add_' + a, pr.clean.addons[a])); }).join('') + '</div>' +
     '<h3>Repairs &amp; Maintenance</h3><div class="a-prg">' + field('pr-dg', 'Diagnostic visit (£)', gp('d_fee', pr.repairs.diagnosisP)) + field('pr-dp', 'Diagnostic visit Pro fee (£)', gp('d_pro', pr.repairs.diagnosisProP)) + field('pr-lp', 'Pro share of labour (%)', n('d_lab', pr.repairs.labourProPct)) + '</div>' +
@@ -1382,7 +1422,7 @@ function readPricingForm(fd) {
   pr.furnish = { part: pp('f_part', pr.furnish.part), furnishedSmall: pp('f_small', pr.furnish.furnishedSmall), furnishedLarge: pp('f_large', pr.furnish.furnishedLarge) };
   pr.extraRoomP = pp('x_room', pr.extraRoomP); pr.outbuildingP = pp('x_out', pr.outbuildingP); pr.outdoorP = pp('x_outdoor', pr.outdoorP);
   pr.sched = { flexOffP: pp('s_flex', pr.sched.flexOffP), priorityP: pp('s_pri', pr.sched.priorityP), priorityProP: pp('s_pripro', pr.sched.priorityProP), flexDays: nn('s_flexd', pr.sched.flexDays), standardDays: nn('s_stdd', pr.sched.standardDays), priorityDays: Math.max(1, nn('s_prid', pr.sched.priorityDays)), priorityOpen: fd.has('s_priOpen'), flexOpen: false };
-  pr.pro.attendP = pp('p_att', pr.pro.attendP); pr.pro.furnishSharePct = Math.min(100, nn('p_fsh', pr.pro.furnishSharePct)); pr.pro.rateByLevel = [1, 2, 3, 4, 5].map(function (l) { return pp('p_rate_' + l, pr.pro.rateByLevel[l - 1]); });
+  pr.pro.attendP = pp('p_att', pr.pro.attendP); pr.pro.furnishSharePct = Math.min(100, nn('p_fsh', pr.pro.furnishSharePct)); var rates = {}; ROLE_KEYS.forEach(function (r) { rates[r] = [1, 2, 3].map(function (l) { return pp('p_rate_' + r + '_' + l, proRate(r, l)); }); }); pr.pro.rates = rates;
   Object.keys(pr.pro.minutes).forEach(function (k) { pr.pro.minutes[k] = [nn('m_' + k + '_0', pr.pro.minutes[k][0]), nn('m_' + k + '_1', pr.pro.minutes[k][1])]; });
   pr.clean.hourP = pp('c_hour', pr.clean.hourP); pr.clean.consumablesP = pp('c_cons', pr.clean.consumablesP); pr.clean.kitP = pp('c_kit', pr.clean.kitP); pr.clean.spreadPct = nn('c_spread', pr.clean.spreadPct);
   Object.keys(pr.clean.minP).forEach(function (t) { pr.clean.minP[t] = pp('c_min_' + t, pr.clean.minP[t]); }); Object.keys(pr.clean.addons).forEach(function (a) { pr.clean.addons[a] = pp('c_add_' + a, pr.clean.addons[a]); });
@@ -1735,6 +1775,7 @@ function cmdSubmit(w) {
   var p = D.properties[w.propertyId]; if (!p || p.clientId !== S.clientId) return deny('Choose one of your properties.');
   if (w.type === 'MAINTENANCE' && !KINDS[w.kind]) return deny('Choose Repairs & Maintenance or Cleaning.');
   if (w.type !== 'MAINTENANCE') w.kind = null;
+  var cb = coverageBlock(p.postcode, w.type === 'MAINTENANCE' ? w.kind : w.type); if (cb) return deny(cb);
   var key = w.type === 'MAINTENANCE' ? w.kind : w.type, keep = ['access', 'schedNote', 'sched', 'flexDates'].concat(isInspK(key) ? ['rooms', 'keys', 'occupant', 'tenantContact', 'contents', 'sameVisit'] : key === 'CLEANING' ? ['clean', 'condition', 'notes', 'addons', 'carpetRooms', 'areaM2', 'frequency', 'facilities'] : ['category', 'location', 'description', 'severity', 'noPhotoReason', 'repairMode']), scope = {};
   keep.forEach(function (f) { if (w.scope && w.scope[f] != null && w.scope[f] !== '') scope[f] = w.scope[f]; });
   if (w.sched) scope.sched = w.sched; if (w.flexDates) scope.flexDates = w.flexDates;
@@ -1799,7 +1840,7 @@ function eligible(pro, j, w) {
   if (!pro) return 'No Pro selected';
   if (pro.status !== 'APPROVED') return 'Not approved';
   if ((pro.skills || []).indexOf(svcKey(j)) < 0) return 'Missing ' + SKILLS[svcKey(j)].label + ' skill';
-  var need = requiredLevel(j); if (need && proLevel(pro) < need) return 'Needs Level ' + need + ' (' + LEVEL_INFO[need].name + ')';
+  var role = jobRole(j), need = requiredLevel(j); if (need && proLevel(pro, role) < need) return 'Needs ' + roleBadge(role, need);
   if (!covers(pro, j.district)) return 'Does not cover ' + j.district;
   var exp = (pro.docs || []).filter(function (d) { return d.expires && d.expires < new Date().toISOString().slice(0, 10); }); if (exp.length) return 'Expired document: ' + exp[0].type;
   var day = w && w.date ? new Date(w.date + 'T12:00:00').getDay() : null; if (day != null && pro.availability && pro.availability.days && pro.availability.days.indexOf(day) < 0) return 'Not available that day';
@@ -1814,6 +1855,17 @@ function cmdOffer(j, proId, w, feeP) {
   var exp = addH(now(), settings().offerValidityHours); if (start && start < exp) exp = start;
   var offers = (j.offers || []).concat([{ id: uid(), proId: proId, window: w, feeP: feeP, status: 'OFFERED', at: now(), expiresAt: exp }]);
   upd(j, { offers: offers }, 'Offered to ' + pro.name + ' for ' + winLabel(w), 'admin'); audit('offer.create', 'job', j.id, 'Offer to ' + pro.name, { feeP: feeP }); notify('p:' + proId, 'New job offer ' + j.ref + ' · ' + P(feeP), j.id); return true;
+}
+/* open jobs: paid jobs with no open offer that a Pro is eligible for in their area. Jobs reach Pros both ways:
+   Pros accept open jobs near them, and LISTD can still send a job straight to a chosen Pro. */
+function openJobsFor(pro) { if (!pro || pro.status !== 'APPROVED') return []; return list('jobs').filter(function (j) { var s = winStart(j.window); return j.status === 'READY_FOR_ASSIGNMENT' && !currentOffer(j) && (!s || hoursFrom(s) > 0) && eligible(pro, j, j.window) === true; }).sort(function (a, b) { return String((a.window || {}).date).localeCompare(String((b.window || {}).date)); }); }
+function openFeeP(j, pro) { var q = acceptedQuote(j); return q && q.proBase ? feeFromBase(q.proBase, proLevel(pro, jobRole(j))) : q ? q.proFeeP || 0 : 0; }
+function cmdTakeOpenJob(j) {
+  var pro = meP(); if (!pro || j.status !== 'READY_FOR_ASSIGNMENT' || currentOffer(j)) return deny('This job is no longer open.');
+  var ok = eligible(pro, j, j.window); if (ok !== true) return deny(ok);
+  var fee = openFeeP(j, pro), offers = (j.offers || []).concat([{ id: uid(), proId: pro.id, window: j.window, feeP: fee, status: 'ACCEPTED', open: true, at: now(), repliedAt: now(), expiresAt: now() }]);
+  upd(j, { offers: offers, proId: pro.id, status: 'SCHEDULED', scheduledAt: now(), agreedFeeP: fee }, pro.name + ' accepted the open job. Scheduled for ' + winLabel(j.window), 'pro');
+  notifyJob(j, 'client admin', j.ref + ': Pro confirmed for ' + winLabel(j.window)); return true;
 }
 function cmdOfferReply(j, accept, reason) {
   var o = currentOffer(j), i = (j.offers || []).indexOf(o);
@@ -2075,9 +2127,10 @@ function vClientNew() {
       (function () { var tot = livingRooms(p), fr = p.furnishedRooms != null ? Math.min(tot, p.furnishedRooms) : p.furnishing === 'furnished' || p.furnishing === 'heavy' ? tot : p.furnishing === 'part' ? Math.ceil(tot / 2) : 0;
         return '<div class="a-rooms">' + rn('w-frn', 'furnishedRooms', 'Furnished rooms', fr) + rn('w-unf', 'unfurnishedRooms', 'Unfurnished rooms', tot - fr) + '</div><p class="a-fine" id="w-furn-note">Count the bedrooms, living room and reception rooms: ' + tot + ' in total. ' + esc(FURNISH[furnLevel(fr, tot)]) + '.</p>' +
           '<label class="a-check"><input type="checkbox" name="heavy"' + (p.furnishing === 'heavy' ? ' checked' : '') + '> Heavily furnished or a very detailed inventory <span class="a-fine">LISTD quotes these individually</span></label>'; })() +
-      '<label class="a-check"><input type="checkbox" name="saveRooms"' + (w.rooms && w.rooms.save === false ? '' : ' checked') + '> Save these room details to ' + esc(p0.label) + '</label><p class="a-fine">The price includes your bedrooms, one kitchen, one bathroom and one living room. Extra bathrooms, kitchens and reception rooms are added as clear line items.</p></fieldset>' + nav(); }
+      '<label class="a-check"><input type="checkbox" name="saveRooms"' + (w.rooms && w.rooms.save === false ? '' : ' checked') + '> Save these room details to ' + esc(p0.label) + '</label><p class="a-fine">The price includes your bedrooms, one kitchen, one bathroom and one living room. Each extra bathroom, kitchen and reception room is its own line in your quote.</p></fieldset>' + nav(); }
   else if (w.step === 2) {
-    h += '<fieldset style="border:0;padding:0;margin:0;display:grid;gap:10px"><legend class="ld-label" style="margin-bottom:4px">Services <small>Select all that apply</small></legend><div class="a-choice a-choice-2 a-multi">' + SVC_ORDER.map(function (t) { var s = SVC[t]; return '<label class="a-opt"><input type="checkbox" name="service" id="w-svc-' + t + '" value="' + t + '"' + (wizHas(w, t) ? ' checked' : '') + '><span class="ic" style="--c:' + s.c + '">' + ic(s.icon, 20) + '</span><b>' + s.label + '</b><span>' + s.d + '</span><i class="tick" aria-hidden="true">' + ic('check', 14) + '</i></label>'; }).join('') + '</div></fieldset><p class="a-fine" id="w-svc-count">' + (w.services.length ? w.services.length + ' selected' : 'Nothing selected yet') + '</p>' + nav();
+    var cov = coverageFor(p0.postcode); if (cov !== 'ALL') h += banner('location', cov === 'CLEANING' ? 'Birmingham: cleaning now, more coming soon' : 'Coming to your area soon', cov === 'CLEANING' ? 'Inspections and repairs are coming soon in Birmingham.' : 'We cover Bristol, the South West and Birmingham today.', '', 'warning');
+    h += '<fieldset style="border:0;padding:0;margin:0;display:grid;gap:10px"><legend class="ld-label" style="margin-bottom:4px">Services <small>Select all that apply</small></legend><div class="a-choice a-choice-2 a-multi">' + SVC_ORDER.map(function (t) { var s = SVC[t], blk = coverageBlock(p0.postcode, t); return '<label class="a-opt"' + (blk ? ' title="' + esc(blk) + '" style="opacity:.55"' : '') + '><input type="checkbox" name="service" id="w-svc-' + t + '" value="' + t + '"' + (wizHas(w, t) && !blk ? ' checked' : '') + (blk ? ' disabled' : '') + '><span class="ic" style="--c:' + s.c + '">' + ic(s.icon, 20) + '</span><b>' + s.label + '</b><span>' + (blk ? 'Coming soon in your area' : s.d) + '</span><i class="tick" aria-hidden="true">' + ic('check', 14) + '</i></label>'; }).join('') + '</div><p class="a-fine">More services coming soon.</p></fieldset><p class="a-fine" id="w-svc-count">' + (w.services.length ? w.services.length + ' selected' : 'Nothing selected yet') + '</p>' + nav();
   } else if (w.step === 3) {
     var sc = w.scope, ins = wizInsp(w);
     if (ins.length) {
@@ -2158,7 +2211,7 @@ function furnLevel(f, tot, heavy) { if (heavy) return 'heavy'; f = +f || 0; retu
 /* job stages: Quote, then Booked → Accepted → In progress → LISTD review → Ready to approve → Approved */
 var RAIL = [['Quote', ['SUBMITTED', 'NEEDS_INFORMATION', 'QUOTED', 'AWAITING_PAYMENT']], ['Booked', ['READY_FOR_ASSIGNMENT']], ['Accepted', ['SCHEDULED']], ['In progress', ['IN_PROGRESS']], ['LISTD review', ['ADMIN_REVIEW', 'CORRECTION_REQUIRED']], ['Ready to approve', ['CLIENT_REVIEW']], ['Approved', ['COMPLETED']]];
 function railIdx(s) { for (var i = 0; i < RAIL.length; i++) if (RAIL[i][1].indexOf(s) >= 0) return i; return -1; }
-function canSeeJob(j) { if (S.role === 'admin') return ENV.canAdmin; if (S.role === 'client') return j.clientId === S.clientId; return j.proId === S.proId || (j.offers || []).some(function (o) { return o.proId === S.proId && o.status === 'OFFERED'; }); }
+function canSeeJob(j) { if (S.role === 'admin') return ENV.canAdmin; if (S.role === 'client') return j.clientId === S.clientId; return j.proId === S.proId || (j.offers || []).some(function (o) { return o.proId === S.proId && o.status === 'OFFERED'; }) || openJobsFor(D.pros[S.proId]).indexOf(j) >= 0; }
 function codesVisible(j) { if (S.role === 'client') return true; if (S.role !== 'pro' || j.proId !== S.proId) return false; if (j.status === 'IN_PROGRESS' || j.status === 'CORRECTION_REQUIRED') return true; return j.status === 'SCHEDULED' && hoursFrom(winStart(j.window)) <= 24; }
 
 function vJob() {
@@ -2179,7 +2232,7 @@ function vJob() {
   var prop = propOf(j), a = prop.access || {}, ct = prop.contact || {};
   if (S.role !== 'pro' || j.proId === S.proId) h += '<div class="a-card"><h3>Access</h3><dl class="a-kv"><dt>Method</dt><dd>' + esc(a.method || '—') + '</dd><dt>Codes</dt><dd>' + (codesVisible(j) ? esc(a.codes || '—') : S.role === 'pro' ? 'Shown 24h before your visit' : '•••• <a href="#" data-go="property" data-id="' + prop.id + '">View on property</a>') + '</dd><dt>Contact</dt><dd>' + (S.role === 'pro' && !codesVisible(j) ? 'Shown 24h before' : esc(ct.name) + ' · ' + esc(ct.phone)) + '</dd>' + (j.scope.access ? '<dt>Notes</dt><dd style="font-weight:500">' + esc(j.scope.access) + '</dd>' : '') + (prop.hazards ? '<dt>Hazards</dt><dd>' + esc(prop.hazards) + '</dd>' : '') + '</dl></div>';
   h += moneyCard(j);
-  if (pro && S.role !== 'pro') { var ps = proStats(pro.id); h += '<div class="a-card"><h3>Pro</h3><div class="a-row">' + avatar(pro.name, pro.status === 'APPROVED', 'lg') + '<div><b>' + esc(pro.name) + '</b><div>' + levelBar(ps.level, ps.levelName) + '</div><div class="a-fine">' + (pro.skills || []).map(function (s) { return SKILLS[s].label; }).join(', ') + '</div><div class="a-fine">' + stars(ps.rating || 0) + ' ' + (ps.ratings ? ps.rating.toFixed(1) + ' (' + ps.ratings + ')' : 'New Pro') + '</div></div></div></div>'; }
+  if (pro && S.role !== 'pro') { var ps = proStats(pro.id); h += '<div class="a-card"><h3>Pro</h3><div class="a-row">' + avatar(pro.name, pro.status === 'APPROVED', 'lg') + '<div><b>' + esc(pro.name) + '</b><div>' + (function () { var r = jobRole(j), l = proLevel(pro, r); return levelBar(l, roleBadge(r, l)) + newBadge(pro, r); })() + '</div><div class="a-fine">' + (pro.skills || []).map(function (s) { return SKILLS[s].label; }).join(', ') + '</div><div class="a-fine">' + stars(ps.rating || 0) + ' ' + (ps.ratings ? ps.rating.toFixed(1) + ' (' + ps.ratings + ')' : 'New Pro') + '</div></div></div></div>'; }
   if (j.attendance && (S.role !== 'client' || j.attendance.inAt)) h += attendanceCard(j);
   h += '<div class="a-card"><h3>History</h3><ol class="a-tl">' + (j.history || []).filter(function (e) { return S.role !== 'pro' || e.role === 'pro' || !/quote|payment|paid|refund|invoice|£/i.test(e.text); }).slice().reverse().map(function (e) { var col = { client: 'var(--service-checkin)', pro: 'var(--brand)', admin: 'var(--service-midterm)' }[e.role] || 'var(--brand)'; return '<li style="--c:' + col + '">' + esc(e.text) + '<span>' + fdate(e.at, true) + ' · ' + esc({ client: 'Client', pro: 'Pro', admin: 'LISTD' }[e.role] || '') + '</span></li>'; }).join('') + '</ol></div>';
   return h + '</aside></div></div>';
@@ -2254,7 +2307,7 @@ function clientPanels(j) {
   h += schedChangePanel(j);
   if (j.status === 'CORRECTION_REQUIRED') h += banner('edit', 'Report being corrected', 'The Pro is updating the report. LISTD will release the new version for review.', '');
   if (j.status === 'ADMIN_REVIEW') h += banner('clock', 'Report submitted', 'LISTD checks every report for completeness before releasing it to you.', '');
-  if (j.status === 'CLIENT_REVIEW') h += banner('signature', 'Review your report', 'Accept it, ask for corrections, or raise a dispute. ' + (openDispute(j) ? 'Review paused while the dispute is open.' : 'If you take no action, it completes automatically in ' + left(j.reviewDueAt) + ' (' + fdate(j.reviewDueAt, true) + ').'), '<button class="ld-btn ld-btn-primary" data-act="r-accept" data-id="' + j.id + '"' + (openDispute(j) ? ' disabled' : '') + '>Accept report</button><button class="ld-btn ld-btn-secondary" data-act="r-correct" data-id="' + j.id + '">Ask for corrections</button>', 'brand');
+  if (j.status === 'CLIENT_REVIEW') h += banner('signature', 'Ready to approve', (isInspK(svcKey(j)) ? 'Check the report, then approve it' : 'Check the evidence, then approve the finished job') + ', ask for corrections, or raise a dispute. Payment is released to the Pro when you approve. ' + (openDispute(j) ? 'Review paused while the dispute is open.' : 'If you take no action, it completes automatically in ' + left(j.reviewDueAt) + ' (' + fdate(j.reviewDueAt, true) + ').'), '<button class="ld-btn ld-btn-primary" data-act="r-accept" data-id="' + j.id + '"' + (openDispute(j) ? ' disabled' : '') + '>' + (isInspK(svcKey(j)) ? 'Approve report' : 'Approve the finished job') + '</button><button class="ld-btn ld-btn-secondary" data-act="r-correct" data-id="' + j.id + '">Ask for corrections</button>', 'brand');
   if (j.status === 'COMPLETED') h += banner('success', 'Completed ' + fdate(j.completion.at, true), j.completion.mode === 'AUTO' ? 'Completed automatically after the review window closed. This doesn’t mean you agreed to every finding.' : 'Thanks for confirming.', '', 'success') + (!j.rating ? rateForm(j) : '');
   if (j.status === 'ON_HOLD') h += banner('warning', 'On hold', esc(j.hold.reason), '', 'warning');
   if (j.status === 'CANCELLED') h += banner('close', 'Cancelled', esc((j.cancel || {}).reason || ''), '');
@@ -2341,7 +2394,7 @@ async function downloadReceipt(j, vat) {
 /* how the Pro fee is worked out: attendance + expected time at the Pro's level rate + allowances (rounded to 50p) */
 function feeBreakdown(j, proId, feeP) {
   var q = acceptedQuote(j) || curQuote(j), b = q && q.proBase, pro = D.pros[proId]; if (!b || !pro) return '';
-  var lv = proLevel(pro), parts = feeParts(b, lv), calc = feeFromBase(b, lv), co = (j.changeOrders || []).filter(function (c) { return c.status === 'PAID' && c.proFeeP; });
+  var lv = proLevel(pro, baseRole(b)), parts = feeParts(b, lv), calc = feeFromBase(b, lv), co = (j.changeOrders || []).filter(function (c) { return c.status === 'PAID' && c.proFeeP; });
   var h = '<details class="a-feeparts"' + (S.role === 'pro' ? ' open' : '') + '><summary>How ' + (S.role === 'pro' ? 'your' : 'the Pro') + ' fee is worked out</summary><table><tbody>' + parts.map(function (x) { return '<tr><td>' + esc(x[0]) + '</td><td class="r">' + P(x[1]) + '</td></tr>'; }).join('') +
     co.map(function (c) { return '<tr><td>Approved extra work: ' + esc(c.desc) + '</td><td class="r">' + P(c.proFeeP) + '</td></tr>'; }).join('');
   var base = feeP - co.reduce(function (a, c) { return a + c.proFeeP; }, 0) - (j.proId ? j.feeAdjP || 0 : 0);
@@ -2365,13 +2418,19 @@ function cmdGroupPay(j) {
 }
 
 /* ===================== Pro portal ===================== */
-function proNav() { return [['home', 'home', 'Dashboard'], ['offers', 'bell', 'Offers'], ['schedule', 'calendar', 'Schedule'], ['training', 'training', 'Training & level'], ['earnings', 'pound', 'Earnings'], ['settings', 'settings', 'Settings']]; }
+function proNav() { return [['home', 'home', 'Dashboard'], ['offers', 'bell', 'Jobs'], ['schedule', 'calendar', 'Schedule'], ['training', 'training', 'Training & level'], ['earnings', 'pound', 'Earnings'], ['settings', 'settings', 'Settings']]; }
 function meP() { return D.pros[S.proId] || null; }
 function proOnboarded() { var p = meP(); return p && p.onboarding && p.onboarding.status === 'SUBMITTED'; }
 function myOffers() { return list('jobs').filter(function (j) { var o = currentOffer(j); return o && o.proId === S.proId && hoursFrom(o.expiresAt) > 0; }); }
 function myWork() { return list('jobs').filter(function (j) { return j.proId === S.proId; }).sort(function (a, b) { return String((a.window || {}).date).localeCompare(String((b.window || {}).date)); }); }
 var DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-var DOCS = [['ID', 'Photo ID (passport or driving licence)', true], ['RTW', 'Right to work evidence', true], ['DBS', 'Basic DBS certificate', true], ['INSURANCE', 'Public liability insurance', false]];
+/* checks and insurance: every Pro needs photo ID, right to work, basic DBS and public liability;
+   Pro Clerks also professional indemnity; Pro Trades also any trade certificates the law requires */
+var DOCS = [['ID', 'Photo ID (passport or driving licence)', 'ALL'], ['RTW', 'Right to work evidence', 'ALL'], ['DBS', 'Basic DBS certificate', 'ALL'], ['INSURANCE', 'Public liability insurance', 'ALL'], ['PI', 'Professional indemnity insurance', 'CLERK'], ['TRADE', 'Trade certificates required by law for your work', 'TRADES']];
+function docNeeded(p, d) { return d[2] === 'ALL' || proRoles(p).indexOf(d[2]) >= 0; }
+function docFor(d) { return d[2] === 'ALL' ? 'All Pros' : ROLES[d[2]].label + 's'; }
+function docLabel(type) { var d = DOCS.filter(function (x) { return x[0] === type; })[0]; return d ? d[1] : type; }
+function docsMissing(p) { return DOCS.filter(function (d) { return docNeeded(p, d) && !(p.docs || []).some(function (x) { return x.type === d[0]; }); }); }
 
 /* ---------- onboarding ---------- */
 var PR_STEPS = ['Account', 'Details', 'Skills & area', 'Availability', 'Documents', 'Payouts', 'Submit'];
@@ -2381,13 +2440,13 @@ function vProOnboard() {
   var back = '<button class="ld-btn ld-btn-secondary" type="button" data-act="pob-back">Back</button>';
   if (step === 1) h += '<form class="a-card a-form" data-form="pr-ob1"><div class="two">' + field('pr-name', 'Full name', inp('pr-name', 'name', '', 'required autocomplete="name"')) + field('pr-email', 'Email', inp('pr-email', 'email', '', 'type="email" required autocomplete="email"')) + '</div><label class="ld-check"><input type="checkbox" name="terms" required><span>I agree to the LISTD Pro terms and privacy notice<small>Test mode placeholders.</small></span></label><div class="a-actions"><button class="ld-btn ld-btn-primary ld-btn-lg" type="submit">Create account & continue</button></div></form>';
   else if (step === 2) h += '<form class="a-card a-form" data-form="pr-ob2"><h3>About you</h3>' + field('pr-name', 'Full name', inp('pr-name', 'name', p.name, 'required autocomplete="name"'), 'As it appears on your photo ID.') + field('pr-bt', 'Working as', sel('pr-bt', 'bizType', [['sole', 'Sole trader / individual'], ['ltd', 'Limited company']], p.bizType || 'sole')) + field('pr-bn', 'Trading or company name <small>Optional for sole traders</small>', inp('pr-bn', 'bizName', p.bizName)) + '<div class="two">' + field('pr-ph', 'Phone', inp('pr-ph', 'phone', p.phone, 'type="tel" required')) + field('pr-pc', 'Home postcode', inp('pr-pc', 'home', p.home, 'required autocapitalize="characters"')) + '</div><div class="a-actions"><button class="ld-btn ld-btn-primary" type="submit">Save & continue</button></div></form>';
-  else if (step === 3) h += '<form class="a-card a-form" data-form="pr-ob3"><fieldset class="a-checks" style="border:0;padding:0;margin:0"><legend class="ld-label" style="margin-bottom:8px">Services you can deliver</legend>' + Object.keys(SKILLS).map(function (k) { return '<label class="ld-check"><input type="checkbox" name="skills" value="' + k + '"' + ((p.skills || []).indexOf(k) >= 0 ? ' checked' : '') + '><span>' + SKILLS[k].label + '</span></label>'; }).join('') + '</fieldset><p class="a-fine">Everyone starts at Level 1 (light cleans) and moves up by applying. Inspections open at Level 4, after the required training. Repairs are approved separately.</p>' + field('pr-cov', 'Postcode districts you cover', inp('pr-cov', 'coverage', (p.coverage || []).join(', '), 'required placeholder="BA1, BA2, BS"'), 'Separate with commas. An area like BS covers every BS district.') + '<div class="a-actions">' + back + '<button class="ld-btn ld-btn-primary" type="submit">Save & continue</button></div></form>';
+  else if (step === 3) h += '<form class="a-card a-form" data-form="pr-ob3"><fieldset class="a-checks" style="border:0;padding:0;margin:0"><legend class="ld-label" style="margin-bottom:8px">Services you can deliver</legend>' + ROLE_KEYS.map(function (r) { return '<div class="a-rolegrp"><b>' + ROLES[r].label + '</b>' + ROLES[r].skills.map(function (k) { return '<label class="ld-check"><input type="checkbox" name="skills" value="' + k + '"' + ((p.skills || []).indexOf(k) >= 0 ? ' checked' : '') + '><span>' + SKILLS[k].label + '</span></label>'; }).join('') + '</div>'; }).join('') + '</fieldset><p class="a-fine">Your services decide your roles: Pro Clerk, Pro Cleaner and Pro Trades. You can hold more than one. Each role starts at Level 1 and has three levels, unlocked by completed jobs and ratings. Your first ' + standardsJobs() + ' jobs in each role get a closer LISTD review.</p>' + field('pr-cov', 'Postcode districts you cover', inp('pr-cov', 'coverage', (p.coverage || []).join(', '), 'required placeholder="BA1, BA2, BS"'), 'Separate with commas. An area like BS covers every BS district.') + '<div class="a-actions">' + back + '<button class="ld-btn ld-btn-primary" type="submit">Save & continue</button></div></form>';
   else if (step === 4) { var av = p.availability || { days: [1, 2, 3, 4, 5], slots: ['morning', 'afternoon'] }; h += '<form class="a-card a-form" data-form="pr-ob4"><fieldset style="border:0;padding:0;margin:0"><legend class="ld-label" style="margin-bottom:8px">Days you usually work</legend><div class="a-row">' + DAYS.map(function (d, i) { return '<label class="ld-check" style="grid-template-columns:20px auto"><input type="checkbox" name="days" value="' + i + '"' + (av.days.indexOf(i) >= 0 ? ' checked' : '') + '><span>' + d + '</span></label>'; }).join('') + '</div></fieldset><fieldset style="border:0;padding:0;margin:0"><legend class="ld-label" style="margin-bottom:8px">Windows</legend><div class="a-row">' + Object.keys(WINDOWS).map(function (w) { return '<label class="ld-check" style="grid-template-columns:20px auto"><input type="checkbox" name="slots" value="' + w + '"' + (av.slots.indexOf(w) >= 0 ? ' checked' : '') + '><span>' + WINDOWS[w][0] + '</span></label>'; }).join('') + '</div></fieldset><div class="a-actions">' + back + '<button class="ld-btn ld-btn-primary" type="submit">Save & continue</button></div></form>'; }
   else if (step === 5) {
-    h += '<div class="a-card a-form"><h3>Verification documents</h3><p class="a-muted">Upload a clear photo or PDF of each. Only LISTD reviewers can see these; they never appear in service reports.</p>' + DOCS.map(function (d) { var have = (p.docs || []).filter(function (x) { return x.type === d[0]; })[0]; return '<div class="a-item" style="grid-template-columns:minmax(0,1fr) auto"><span class="nm">' + d[1] + (d[2] ? '' : ' <small class="a-fine">(needed for repairs)</small>') + (have ? '<br><span class="a-fine">' + ic('success', 14) + ' ' + esc(have.name) + (have.expires ? ' · expires ' + fdate(have.expires) : '') + '</span>' : '') + '</span>' + upBtn({ doc: d[0], allowPdf: true }, have ? 'Replace' : 'Upload', false) + '</div>'; }).join('') +
-      field('pr-dexp', 'DBS or insurance expiry date <small>If applicable</small>', inp('pr-dexp', 'expires', (p.docs || []).reduce(function (a, d) { return a || d.expires; }, ''), 'type="date" data-docexp="1"')) + '<div class="a-actions">' + back + '<button class="ld-btn ld-btn-primary" data-act="pob-docs">Continue</button></div></div>';
+    h += '<div class="a-card a-form"><h3>Verification documents</h3><p class="a-muted">Upload a clear photo or PDF of each. Only LISTD reviewers can see these; they never appear in service reports.</p>' + DOCS.map(function (d) { var have = (p.docs || []).filter(function (x) { return x.type === d[0]; })[0]; return '<div class="a-item" style="grid-template-columns:minmax(0,1fr) auto"><span class="nm">' + d[1] + (d[2] === 'ALL' ? '' : ' <small class="a-fine">(' + (docNeeded(p, d) ? 'needed as a ' + ROLES[d[2]].label : 'only for ' + ROLES[d[2]].label + 's') + ')</small>') + (have ? '<br><span class="a-fine">' + ic('success', 14) + ' ' + esc(have.name) + (have.expires ? ' · expires ' + fdate(have.expires) : '') + '</span>' : '') + '</span>' + upBtn({ doc: d[0], allowPdf: true }, have ? 'Replace' : 'Upload', false) + '</div>'; }).join('') +
+      field('pr-dexp', 'DBS, insurance or certificate expiry date <small>If applicable</small>', inp('pr-dexp', 'expires', (p.docs || []).reduce(function (a, d) { return a || d.expires; }, ''), 'type="date" data-docexp="1"')) + '<div class="a-actions">' + back + '<button class="ld-btn ld-btn-primary" data-act="pob-docs">Continue</button></div></div>';
   } else if (step === 6) h += '<form class="a-card a-form" data-form="pr-ob6"><h3>Payout account</h3><p class="a-muted">In the live product this opens the payment provider’s secure onboarding. In test mode, confirm the details below. Don’t enter real bank details.</p>' + field('pr-ah', 'Account holder name', inp('pr-ah', 'holder', (p.payout || {}).holder || p.name, 'required')) + field('pr-l4', 'Last 4 digits of account <small>Test value</small>', inp('pr-l4', 'last4', (p.payout || {}).last4, 'required inputmode="numeric" pattern="[0-9]{4}" maxlength="4"')) + '<div class="a-actions">' + back + '<button class="ld-btn ld-btn-primary" type="submit">Save & continue</button></div></form>';
-  else h += '<div class="a-card"><h3>Ready to submit</h3><dl class="a-kv"><dt>Name</dt><dd>' + esc(p.name) + '</dd><dt>Services</dt><dd>' + (p.skills || []).map(function (s) { return SKILLS[s].label; }).join(', ') + '</dd><dt>Coverage</dt><dd>' + esc((p.coverage || []).join(', ')) + '</dd><dt>Availability</dt><dd>' + (p.availability.days || []).map(function (d) { return DAYS[d]; }).join(', ') + '</dd><dt>Documents</dt><dd>' + (p.docs || []).length + ' uploaded</dd><dt>Payouts</dt><dd>Account ending ' + esc((p.payout || {}).last4) + ' (test)</dd></dl><label class="ld-check"><input type="checkbox" id="pob-terms"' + (p.consent && p.consent.terms ? ' checked' : '') + '><span>I agree to the LISTD Pro terms and privacy notice<small>Test mode: placeholders until legal terms are approved.</small></span></label><div class="a-actions">' + back + '<button class="ld-btn ld-btn-primary ld-btn-lg" data-act="pob-submit">Submit for review</button></div></div>';
+  else h += '<div class="a-card"><h3>Ready to submit</h3><dl class="a-kv"><dt>Name</dt><dd>' + esc(p.name) + '</dd><dt>Roles</dt><dd>' + (proRoles(p).map(function (r) { return ROLES[r].label; }).join(', ') || '—') + '</dd><dt>Services</dt><dd>' + (p.skills || []).map(function (s) { return SKILLS[s].label; }).join(', ') + '</dd><dt>Coverage</dt><dd>' + esc((p.coverage || []).join(', ')) + '</dd><dt>Availability</dt><dd>' + (p.availability.days || []).map(function (d) { return DAYS[d]; }).join(', ') + '</dd><dt>Documents</dt><dd>' + (p.docs || []).length + ' uploaded</dd><dt>Payouts</dt><dd>Account ending ' + esc((p.payout || {}).last4) + ' (test)</dd></dl><label class="ld-check"><input type="checkbox" id="pob-terms"' + (p.consent && p.consent.terms ? ' checked' : '') + '><span>I agree to the LISTD Pro terms and privacy notice<small>Test mode: placeholders until legal terms are approved.</small></span></label><div class="a-actions">' + back + '<button class="ld-btn ld-btn-primary ld-btn-lg" data-act="pob-submit">Submit for review</button></div></div>';
   return h + '</div>';
 }
 function proStatusBanner(p) {
@@ -2401,14 +2460,15 @@ function proStatusBanner(p) {
 /* ---------- views ---------- */
 function vProHome() {
   var p = meP(), ps = proStats(p.id), offers = myOffers(), up = myWork().filter(function (j) { return ['SCHEDULED', 'IN_PROGRESS', 'CORRECTION_REQUIRED'].indexOf(j.status) >= 0; });
-  var h = '<div class="a-page"><div class="a-head"><div><h1>Hi, ' + esc(p.name.split(' ')[0]) + '</h1><p>' + (p.skills || []).map(function (s) { return SKILLS[s].label; }).join(' · ') + '</p></div></div>' + proStatusBanner(p);
-  h += '<div class="a-grid k">' + stat('Open offers', offers.length) + stat('Upcoming jobs', up.length) + stat('Payable', P(ps.payable)) + stat('Paid to you', P(ps.paid)) + '</div>';
-  if (offers.length) h += '<section class="a-sec"><h2>New offers</h2><div class="a-jobs">' + offers.map(function (j) { return jobRow(j, 'pro'); }).join('') + '</div></section>';
-  h += '<section class="a-sec"><h2>Your schedule</h2>' + (up.length ? '<div class="a-jobs">' + up.map(function (j) { return jobRow(j, 'pro'); }).join('') + '</div>' : empty('calendar', 'Nothing scheduled', p.status === 'APPROVED' ? 'Offers from LISTD appear on your dashboard. Accept one to add it here.' : 'You’ll receive offers once approved.', '')) + '</section>';
-  h += '<div class="a-card"><div class="a-row sb"><div>' + levelBar(ps.level, ps.levelName) + '<p class="a-fine" style="margin-top:6px">' + ps.completed + ' completed jobs · ' + esc(LEVEL_INFO[ps.level].unlocks) + '</p><button type="button" class="ld-btn ld-btn-secondary ld-btn-sm" data-go="training" style="margin-top:8px">' + (ps.level < 5 ? 'How to reach Level ' + (ps.level + 1) : 'Training & level') + '</button></div><div class="a-fine">' + stars(ps.rating || 0) + ' ' + (ps.ratings ? ps.rating.toFixed(1) + ' from ' + ps.ratings + ' rating' + (ps.ratings > 1 ? 's' : '') : 'No ratings yet') + '</div></div></div>';
+  var h = '<div class="a-page"><div class="a-head"><div><h1>Hi, ' + esc(p.name.split(' ')[0]) + '</h1><p>' + (proRoles(p).map(function (r) { return ROLES[r].label; }).join(' · ') || 'No role yet') + '</p></div></div>' + proStatusBanner(p), open = openJobsFor(p);
+  h += '<div class="a-grid k">' + stat('Offers & open jobs', offers.length + open.length) + stat('Upcoming jobs', up.length) + stat('Payable', P(ps.payable)) + stat('Paid to you', P(ps.paid)) + '</div>';
+  if (offers.length) h += '<section class="a-sec"><h2>Sent to you by LISTD</h2><div class="a-jobs">' + offers.map(function (j) { return jobRow(j, 'pro'); }).join('') + '</div></section>';
+  if (open.length) h += '<section class="a-sec"><h2>Open jobs near you <button class="ld-btn ld-btn-ghost ld-btn-sm" data-go="offers">View all</button></h2><div class="a-jobs">' + open.slice(0, 4).map(function (j) { return jobRow(j, 'pro'); }).join('') + '</div></section>';
+  h += '<section class="a-sec"><h2>Your schedule</h2>' + (up.length ? '<div class="a-jobs">' + up.map(function (j) { return jobRow(j, 'pro'); }).join('') + '</div>' : empty('calendar', 'Nothing scheduled', p.status === 'APPROVED' ? 'Accept an open job near you, or one LISTD sends you, to add it here.' : 'You’ll receive offers once approved.', '')) + '</section>';
+  h += '<div class="a-card"><div class="a-row sb"><div>' + roleBars(p) + '<p class="a-fine" style="margin-top:6px">' + ps.completed + ' completed jobs · ' + esc(proRoles(p).map(function (r) { return ROLES[r].unlocks[proLevel(p, r)]; }).join('; ')) + '</p><button type="button" class="ld-btn ld-btn-secondary ld-btn-sm" data-go="training" style="margin-top:8px">Training & levels</button></div><div class="a-fine">' + stars(ps.rating || 0) + ' ' + (ps.ratings ? ps.rating.toFixed(1) + ' from ' + ps.ratings + ' rating' + (ps.ratings > 1 ? 's' : '') : 'No ratings yet') + '</div></div></div>';
   return h + '</div>';
 }
-function vProOffers() { var o = myOffers(); return '<div class="a-page"><div class="a-head"><div><h1>Offers</h1><p>Each offer shows your fee, scope and slot. Accept before it expires.</p></div></div>' + proStatusBanner(meP()) + (o.length ? '<div class="a-jobs">' + o.map(function (j) { return jobRow(j, 'pro'); }).join('') + '</div>' : empty('bell', 'No open offers', 'LISTD offers you jobs that match your skills, area and availability.', '')) + '</div>'; }
+function vProOffers() { var o = myOffers(), open = openJobsFor(meP()); return '<div class="a-page"><div class="a-head"><div><h1>Jobs</h1><p>Accept open jobs in your area, or jobs LISTD sends straight to you. Each shows your fee, scope and slot.</p></div></div>' + proStatusBanner(meP()) + '<section class="a-sec"><h2>Sent to you by LISTD</h2>' + (o.length ? '<div class="a-jobs">' + o.map(function (j) { return jobRow(j, 'pro'); }).join('') + '</div>' : '<p class="a-muted">Nothing sent to you right now. Accept before an offer expires.</p>') + '</section><section class="a-sec"><h2>Open jobs near you</h2>' + (open.length ? '<div class="a-jobs">' + open.map(function (j) { return jobRow(j, 'pro'); }).join('') + '</div>' : empty('bell', 'No open jobs near you', 'Open jobs that match your roles, levels, area and availability appear here.', '')) + '</section></div>'; }
 function vProSchedule() {
   var w = myWork(), up = w.filter(function (j) { return OPEN_STATES.indexOf(j.status) >= 0; }), past = w.filter(function (j) { return OPEN_STATES.indexOf(j.status) < 0; }).reverse();
   var byDay = {}; up.forEach(function (j) { (byDay[j.window.date] = byDay[j.window.date] || []).push(j); });
@@ -2433,6 +2493,7 @@ function proPanels(j) {
     var ok = eligible(p, j, o.window);
     h += banner('pound', 'Offer: ' + P(o.feeP) + ' for ' + winLabel(o.window), 'Expires ' + fdate(o.expiresAt, true) + ' (' + left(o.expiresAt) + '). Duration about ' + Math.round(((acceptedQuote(j) || {}).durationMin || 60) / 6) / 10 + ' hours.' + (ok !== true ? '<br><b>' + esc(ok) + '</b>' : ''), (ok === true ? '<button class="ld-btn ld-btn-primary" data-act="offer-yes" data-id="' + j.id + '">Accept job</button>' : '') + '<button class="ld-btn ld-btn-secondary" data-act="offer-no" data-id="' + j.id + '">Decline</button>', 'brand');
   }
+  if (!o && !j.proId && j.status === 'READY_FOR_ASSIGNMENT') { var ok2 = eligible(p, j, j.window); h += banner('pound', 'Open job: ' + P(openFeeP(j, p)) + ' for ' + winLabel(j.window), 'Duration about ' + Math.round(((acceptedQuote(j) || {}).durationMin || 60) / 6) / 10 + ' hours. The first Pro to accept gets the job.' + (ok2 !== true ? '<br><b>' + esc(ok2) + '</b>' : ''), ok2 === true ? '<button class="ld-btn ld-btn-primary" data-act="take-open" data-id="' + j.id + '">Accept job</button>' : '', 'brand'); }
   if (j.proId !== S.proId) return h;
   if (j.status === 'SCHEDULED') {
     var sel_ = S.clockPhoto && S.clockPhoto[j.id] ? D.evidence[S.clockPhoto[j.id]] : null;
@@ -2560,7 +2621,7 @@ function setWork() {
 }
 function setDocs() {
   var p = meP();
-  return secHeadS('Documents', 'Only LISTD reviewers can see these. Expired documents pause new offers.') + '<div class="a-card a-form">' + DOCS.map(function (d) { var have = (p.docs || []).filter(function (x) { return x.type === d[0]; })[0], exp = have && have.expires && have.expires < new Date().toISOString().slice(0, 10); return '<div class="a-item" style="grid-template-columns:minmax(0,1fr) auto"><span class="nm">' + d[1] + (have ? '<br><span class="a-fine">' + esc(have.name) + (have.expires ? ' · expires ' + fdate(have.expires) : '') + '</span>' + (exp ? ' ' + badge('Expired', 'danger') : '') : '<br><span class="a-fine">Not uploaded</span>') + '</span>' + upBtn({ doc: d[0], allowPdf: true }, have ? 'Replace' : 'Upload', false) + '</div>'; }).join('') + field('pr-dexp', 'DBS or insurance expiry date', inp('pr-dexp', 'expires', p.docExpiry || '', 'type="date" data-docexp="1"')) + '</div>';
+  return secHeadS('Documents', 'Only LISTD reviewers can see these. Expired documents pause new offers.') + '<div class="a-card a-form">' + DOCS.map(function (d) { var have = (p.docs || []).filter(function (x) { return x.type === d[0]; })[0], exp = have && have.expires && have.expires < new Date().toISOString().slice(0, 10); return '<div class="a-item" style="grid-template-columns:minmax(0,1fr) auto"><span class="nm">' + d[1] + (d[2] === 'ALL' ? '' : ' <small class="a-fine">(' + (docNeeded(p, d) ? 'needed as a ' + ROLES[d[2]].label : 'only for ' + ROLES[d[2]].label + 's') + ')</small>') + (have ? '<br><span class="a-fine">' + esc(have.name) + (have.expires ? ' · expires ' + fdate(have.expires) : '') + '</span>' + (exp ? ' ' + badge('Expired', 'danger') : '') : '<br><span class="a-fine">Not uploaded</span>') + '</span>' + upBtn({ doc: d[0], allowPdf: true }, have ? 'Replace' : 'Upload', false) + '</div>'; }).join('') + field('pr-dexp', 'DBS or insurance expiry date', inp('pr-dexp', 'expires', p.docExpiry || '', 'type="date" data-docexp="1"')) + '</div>';
 }
 function setPayouts() {
   var p = meP(), po = p.payout || {};
@@ -3168,7 +3229,7 @@ function vAdminPolicies() {
   var s = settings(), tab = S.polTab || 'catalogue', pn = function (t, html) { return '<div class="a-fs" role="tabpanel" id="pt-' + t + '" aria-labelledby="ptb-' + t + '"' + (tab === t ? '' : ' hidden') + '>' + html + '</div>'; }, n = function (name, v, step) { return '<input class="a-mini num" type="number" min="0" step="' + (step || 1) + '" name="' + name + '" id="pol-' + name + '" value="' + v + '">'; };
   return '<div class="a-page" style="max-width:920px"><div class="a-head"><div><h1>Catalogue & policies</h1><p>Changes apply to new quotes and offers only. Issued quotes keep their snapshot.</p></div></div><div class="a-segtabs" role="tablist" aria-label="Catalogue and policies">' + [['catalogue', 'Services & Pro levels'], ['header', 'Inspection report header'], ['policies', 'Policies']].map(function (t) { return '<button type="button" role="tab" id="ptb-' + t[0] + '" aria-controls="pt-' + t[0] + '" data-act="pol-tab" data-t="' + t[0] + '" aria-selected="' + (tab === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div><form class="a-card a-form" data-form="policies">' + pn('catalogue', 
     '<h3>Services</h3><p class="a-muted">Inventory · Check-In · Mid-Term · Check-Out · Repairs & Maintenance · Cleaning (Standard Home, Deep, End of Tenancy, Office). Prices, Pro fees and the contribution floor are set under Pricing.</p>' +
-    '<h3>Pro levels <small class="a-fine">What a Pro needs before they can apply for each level</small></h3><div class="a-tw"><table><thead><tr><th>Level</th><th>Min. completed jobs</th><th>Min. average rating</th><th>Hourly rate</th></tr></thead><tbody>' + [1, 2, 3, 4, 5].map(function (k) { var r = lvRule(k); return '<tr><td>Level ' + k + ' · ' + esc(LEVEL_INFO[k].name) + '</td><td>' + n('lv_' + k + '_jobs', r.minJobs) + '</td><td>' + n('lv_' + k + '_rating', r.minRating, 0.1) + '</td><td class="num">' + P(proRate(k)) + '</td></tr>'; }).join('') + '</tbody></table></div><p class="a-fine">Levels 4 and 5 also need every training marked for that level. Hourly rates feed the workload-based Pro fee and are set under Pricing.</p>' +
+    '<h3>Pro roles & levels <small class="a-fine">Pro Clerk, Pro Cleaner and Pro Trades each have three levels. What a Pro needs, in the role, before applying for each level</small></h3><div class="a-tw"><table><thead><tr><th>Level</th><th>Min. completed jobs in the role</th><th>Min. average rating</th><th>Hourly rates (Clerk / Cleaner / Trades)</th></tr></thead><tbody>' + [1, 2, 3].map(function (k) { var r = lvRule(k); return '<tr><td>Level ' + k + '</td><td>' + n('lv_' + k + '_jobs', r.minJobs) + '</td><td>' + n('lv_' + k + '_rating', r.minRating, 0.1) + '</td><td class="num">' + ROLE_KEYS.map(function (ro) { return P(proRate(ro, k)); }).join(' / ') + '</td></tr>'; }).join('') + '</tbody></table></div>' + field('pol-sj', 'Standards check: jobs in each role with a closer LISTD review', n('standardsJobs', standardsJobs()).replace('id="pol-standardsJobs"', 'id="pol-sj"'), 'Pros show a “New to LISTD” badge until they pass.') + '<p class="a-fine">Levels also need any training required for that role and level. Hourly rates for each role and level feed the workload-based Pro fee and are set under Pricing.</p>' +
     '') + pn('header', '<h3>Inspection report header</h3><p class="a-fine">Shown on the cover of every check-in and check-out PDF.</p><div class="two">' + field('pol-cn', 'Company name', inp('pol-cn', 'coName', s.company.name)) + field('pol-cp', 'Phone', inp('pol-cp', 'coPhone', s.company.phone)) + '</div><div class="two">' + field('pol-ca', 'Address', inp('pol-ca', 'coAddr', s.company.address)) + field('pol-ce', 'Email', inp('pol-ce', 'coEmail', s.company.email)) + '</div>' + '') + pn('policies', '<h3>Policies</h3><div class="two">' + field('pol-qv', 'Quote validity (days)', n('quoteValidityDays', s.quoteValidityDays).replace('id="pol-quoteValidityDays"', 'id="pol-qv"')) + field('pol-ov', 'Offer validity (hours)', n('offerValidityHours', s.offerValidityHours).replace('id="pol-offerValidityHours"', 'id="pol-ov"')) + '</div><div class="two">' + field('pol-rh', 'Client review window (hours)', n('reviewHours', s.reviewHours).replace('id="pol-reviewHours"', 'id="pol-rh"')) + field('pol-rs', 'Short-notice reschedule threshold (hours)', n('rescheduleHours', s.rescheduleHours).replace('id="pol-rescheduleHours"', 'id="pol-rs"')) + '</div>' +
     field('pol-rc', 'Repair categories', inp('pol-rc', 'repairCategories', s.repairCategories.join(', ')), 'Comma separated.')) + field('pol-why', 'Reason for change', inp('pol-why', 'reason', '', 'required'), 'Recorded in the audit log.') +
     '<div class="a-actions"><button class="ld-btn ld-btn-primary" type="submit">Save policies</button></div></form></div>';
@@ -3197,9 +3258,9 @@ function offerForm(j) {
   var o = currentOffer(j);
   if (o) return banner('bell', 'Offer out to ' + D.pros[o.proId].name, 'For ' + winLabel(o.window) + ' at ' + P(o.feeP) + '. Expires ' + fdate(o.expiresAt, true) + ' (' + left(o.expiresAt) + ').', '<button class="ld-btn ld-btn-secondary ld-btn-sm" data-act="revoke" data-id="' + j.id + '">Withdraw offer</button>', 'brand');
   var q = acceptedQuote(j), w = j.window, pros = list('pros').filter(function (p) { return p.status === 'APPROVED'; });
-  var opts = pros.map(function (p) { var e = eligible(p, j, w); return [p.id, p.name + ' · ' + (p.coverage || []).join(', ') + (e === true ? '' : ' — ' + e)]; });
+  var opts = pros.map(function (p) { var e = eligible(p, j, w), ro = jobRole(j); return [p.id, p.name + ' · ' + roleBadge(ro, proLevel(p, ro)) + (standardsCheck(p, ro).passed ? '' : ' · New to LISTD') + ' · ' + (p.coverage || []).join(', ') + (e === true ? '' : ' — ' + e)]; });
   var stale = j.readyAt && hoursFrom(j.readyAt) < -24;
-  return '<form class="a-card a-form" data-form="offer" data-id="' + j.id + '" style="border-color:var(--brand)"><h3>' + ic('verified-pro', 18) + ' Offer to a Pro</h3>' + (stale ? '<p class="a-fine" style="color:var(--danger)">Paid ' + fdate(j.readyAt, true) + ': over 24 hours without a confirmed Pro.</p>' : '') + ((j.scope || {}).sched === 'flex' && j.scope.flexDates ? '<p class="a-fine">Flex booking: pick one of the client’s dates: ' + j.scope.flexDates.filter(Boolean).map(function (d) { return fdate(d); }).join(', ') + '.</p>' : (j.scope || {}).sched === 'priority' ? '<p class="a-fine">Priority: the appointment must be within ' + pricing().sched.priorityDays + ' working days of booking (by ' + fdate(addWorkDays(String(j.createdAt).slice(0, 10), pricing().sched.priorityDays)) + '). ' + ((j.scope || {}).sameVisit && j.type === 'CHECK_IN' ? 'The Priority premium and the Pro’s ' + P(pricing().sched.priorityProP) + ' allowance sit on the linked inventory.' : 'The fee includes the ' + P(pricing().sched.priorityProP) + ' Priority allowance.') + '</p>' : '') + ((j.scope || {}).sameVisit ? '<p class="a-fine">Same visit as the linked ' + (j.type === 'INVENTORY' ? 'check-in' : 'inventory') + '. Offer both to the same Pro for the same slot.</p>' : '') + (pros.length ? field('of-pro', 'Pro', sel('of-pro', 'proId', [['', 'Choose an approved Pro']].concat(opts), '', 'required'), 'Eligibility is checked again for the slot you choose and when the Pro accepts.') : '<p class="a-muted">No approved Pros yet. Approve one under Pros.</p>') + '<div class="two">' + field('of-date', 'Date', inp('of-date', 'date', w.date, 'type="date" required')) + field('of-slot', 'Window', sel('of-slot', 'slot', Object.keys(WINDOWS).map(function (k) { return [k, WINDOWS[k][0] + ' ' + WINDOWS[k][1] + '–' + WINDOWS[k][2]]; }), w.slot)) + '</div>' + field('of-fee', 'Pro fee £', inp('of-fee', 'fee', ((q ? q.proFeeP : 0) / 100).toFixed(2), 'type="number" min="0" step="0.01" required data-job="' + j.id + '"'), 'Agreed before the Pro accepts: worked out from the expected workload at the chosen Pro’s level rate. You can change it; changes are audited.') + '<div class="a-actions"><button class="ld-btn ld-btn-primary" type="submit"' + (pros.length ? '' : ' disabled') + '>Send offer</button></div></form>';
+  return '<form class="a-card a-form" data-form="offer" data-id="' + j.id + '" style="border-color:var(--brand)"><h3>' + ic('verified-pro', 18) + ' Send straight to a Pro</h3><p class="a-fine">Until then the job is open: eligible Pros in the area can accept it themselves.</p>' + (stale ? '<p class="a-fine" style="color:var(--danger)">Paid ' + fdate(j.readyAt, true) + ': over 24 hours without a confirmed Pro.</p>' : '') + ((j.scope || {}).sched === 'flex' && j.scope.flexDates ? '<p class="a-fine">Flex booking: pick one of the client’s dates: ' + j.scope.flexDates.filter(Boolean).map(function (d) { return fdate(d); }).join(', ') + '.</p>' : (j.scope || {}).sched === 'priority' ? '<p class="a-fine">Priority: the appointment must be within ' + pricing().sched.priorityDays + ' working days of booking (by ' + fdate(addWorkDays(String(j.createdAt).slice(0, 10), pricing().sched.priorityDays)) + '). ' + ((j.scope || {}).sameVisit && j.type === 'CHECK_IN' ? 'The Priority premium and the Pro’s ' + P(pricing().sched.priorityProP) + ' allowance sit on the linked inventory.' : 'The fee includes the ' + P(pricing().sched.priorityProP) + ' Priority allowance.') + '</p>' : '') + ((j.scope || {}).sameVisit ? '<p class="a-fine">Same visit as the linked ' + (j.type === 'INVENTORY' ? 'check-in' : 'inventory') + '. Offer both to the same Pro for the same slot.</p>' : '') + (pros.length ? field('of-pro', 'Pro', sel('of-pro', 'proId', [['', 'Choose an approved Pro']].concat(opts), '', 'required'), 'Eligibility is checked again for the slot you choose and when the Pro accepts.') : '<p class="a-muted">No approved Pros yet. Approve one under Pros.</p>') + '<div class="two">' + field('of-date', 'Date', inp('of-date', 'date', w.date, 'type="date" required')) + field('of-slot', 'Window', sel('of-slot', 'slot', Object.keys(WINDOWS).map(function (k) { return [k, WINDOWS[k][0] + ' ' + WINDOWS[k][1] + '–' + WINDOWS[k][2]]; }), w.slot)) + '</div>' + field('of-fee', 'Pro fee £', inp('of-fee', 'fee', ((q ? q.proFeeP : 0) / 100).toFixed(2), 'type="number" min="0" step="0.01" required data-job="' + j.id + '"'), 'Agreed before the Pro accepts: worked out from the expected workload at the chosen Pro’s level rate. You can change it; changes are audited.') + '<div class="a-actions"><button class="ld-btn ld-btn-primary" type="submit"' + (pros.length ? '' : ' disabled') + '>Send offer</button></div></form>';
 }
 function reasonForm(kind, j, label, btn, tone, extra) { return '<form class="a-form" data-form="' + kind + '" data-id="' + j.id + '">' + (extra || '') + field(kind + '-r-' + j.id, label, inp(kind + '-r-' + j.id, 'reason', '', 'required')) + '<div class="a-actions"><button class="ld-btn ' + (tone || 'ld-btn-secondary') + ' ld-btn-sm" type="submit">' + btn + '</button></div></form>'; }
 function adminPanels(j) {
@@ -3208,7 +3269,7 @@ function adminPanels(j) {
   if (st === 'READY_FOR_ASSIGNMENT') h += offerForm(j);
   if (st === 'SCHEDULED') h += '<div class="a-card"><h3>Assignment</h3><p>' + esc(D.pros[j.proId].name) + ' · ' + winLabel(j.window) + '</p>' + reasonForm('revoke', j, 'Reason for removing this Pro', 'Revoke & reassign', 'ld-btn-danger') + '<div class="a-actions"><button class="ld-btn ld-btn-ghost ld-btn-sm" data-act="resched" data-id="' + j.id + '">Propose new time</button></div></div>';
   h += schedChangePanel(j);
-  if (st === 'ADMIN_REVIEW') { var r = latestReport(j); h += '<div class="a-card" style="border-color:var(--brand)"><h3>' + ic('inventory', 18) + ' Review report v' + r.v + '</h3><p class="a-muted">Check every required section and photo below.</p><div class="a-actions"><button class="ld-btn ld-btn-primary" data-act="release" data-id="' + j.id + '">Release to client</button></div>' + reasonForm('return', j, 'Or return to the Pro with reasons', 'Return for correction', 'ld-btn-danger') + '</div>'; }
+  if (st === 'ADMIN_REVIEW') { var r = latestReport(j); h += '<div class="a-card" style="border-color:var(--brand)"><h3>' + ic('inventory', 18) + ' Review report v' + r.v + '</h3><p class="a-muted">Check every required section and photo below.</p>' + (function () { var pr = D.pros[j.proId], ro = jobRole(j), sc = pr && standardsCheck(pr, ro); return sc && !sc.passed ? '<div class="a-banner" style="--t:var(--info-subtle);--c:var(--info)">' + ic('verified-pro', 20) + '<div><b>Standards check: review closely</b><p>' + esc(pr.name) + ' is New to LISTD as a ' + esc(ROLES[ro].label) + ' (job ' + (sc.done + 1) + ' of ' + sc.n + '). Check every item, photo and rating before releasing.</p></div></div>' : ''; })() + '<div class="a-actions"><button class="ld-btn ld-btn-primary" data-act="release" data-id="' + j.id + '">Release to client</button></div>' + reasonForm('return', j, 'Or return to the Pro with reasons', 'Return for correction', 'ld-btn-danger') + '</div>'; }
   if (j.attendance && j.attendance.review === 'EXCEPTION_PENDING') h += '<div class="a-card"><h3>Attendance exception</h3><p>' + esc(j.attendance.exception) + '</p>' + reasonForm('att-ok', j, 'Approval note', 'Approve exception') + '</div>';
   if (st === 'CLIENT_REVIEW') h += banner('clock', 'With client', 'Auto-completes ' + fdate(j.reviewDueAt, true) + ' if no correction or dispute.', openDispute(j) ? '' : '<button class="ld-btn ld-btn-secondary ld-btn-sm" data-act="admin-complete" data-id="' + j.id + '">Mark complete on client’s behalf</button>', '');
   if (j.cancelRequest && !j.cancelRequest.done && st !== 'CANCELLED') h += banner('close', ({ client: 'Client', pro: 'Pro' })[j.cancelRequest.by] + ' asked to cancel', esc(j.cancelRequest.reason), '<button class="ld-btn ld-btn-ghost ld-btn-sm" data-act="cancel-req-done" data-id="' + j.id + '">Mark handled</button>', 'warning');
@@ -3562,86 +3623,104 @@ function vAnalyticsOps(per) {
   var pc = function (v) { return v == null ? '—' : Math.round(v * 100) + '%'; };
   var tot = rows.reduce(function (a, r) { a.o += r.offers; a.oa += r.offerRate == null ? 0 : r.offerRate * r.offers; a.as += r.assigned; a.d += r.done; return a; }, { o: 0, oa: 0, as: 0, d: 0 });
   h += '<section class="a-sec"><h2>Pro performance</h2>' + (rows.length ? '<div class="a-grid k">' + stat('Active Pros', rows.length) + stat('Offer acceptance', tot.o ? Math.round(tot.oa / tot.o * 100) + '%' : '—') + stat('Completion rate', tot.as ? Math.round(tot.d / tot.as * 100) + '%' : '—', tot.d + ' of ' + tot.as + ' assigned jobs') + stat('Productivity', Math.round(rows.reduce(function (a, r) { return a + r.perWeek; }, 0) / rows.length * 10) / 10, 'completed jobs per Pro per week') + '</div>' +
-    '<div>' + '<section class="a-card an-chart"><h3>Productivity rate</h3><p class="a-fine">Completed jobs per week' + (days ? ' over the period' : ' since their first job') + '.</p>' + anBars(rows.slice(0, 8).map(function (r) { return { label: r.p.name || 'Pro', sub: 'Level ' + proLevel(r.p) + ' · ' + LEVEL_INFO[proLevel(r.p)].name, v: r.perWeek, txt: Math.round(r.perWeek * 10) / 10 + ' / week' }; })) + '</section></div>' : empty('verified-pro', 'No Pro activity in this period', 'Pros appear here once they receive offers or jobs.', '')) + '</section>';
+    '<div>' + '<section class="a-card an-chart"><h3>Productivity rate</h3><p class="a-fine">Completed jobs per week' + (days ? ' over the period' : ' since their first job') + '.</p>' + anBars(rows.slice(0, 8).map(function (r) { return { label: r.p.name || 'Pro', sub: proStats(r.p.id).levelName, v: r.perWeek, txt: Math.round(r.perWeek * 10) / 10 + ' / week' }; })) + '</section></div>' : empty('verified-pro', 'No Pro activity in this period', 'Pros appear here once they receive offers or jobs.', '')) + '</section>';
   return h;
 }
 
-/* ===================== Pro levels, training & applications ===================== */
-/* Levels 1-3: cleaning. Levels 4-5: inspections and a higher hourly rate.
-   Moving up needs a level application that an Admin approves. Levels 4 and 5 also need every
-   training marked for that level (or below) to be completed first; this rule has no override. */
+/* ===================== Pro roles, levels, training & applications ===================== */
+/* Three roles (Pro Clerk, Pro Cleaner, Pro Trades); a Pro can hold more than one. Each role has three levels,
+   unlocked by completed jobs and ratings in that role. Moving up needs a level application that an Admin approves.
+   A Pro's first jobs in each role get a closer LISTD review (the standards check, badge "New to LISTD").
+   Trainings can be required for a role and level; that rule has no override. */
 
-function lvRule(n) { var l = settings().levels || DEFAULT_SETTINGS.levels; return Object.assign({}, DEFAULT_SETTINGS.levels[n - 1], l[n - 1] || {}); }
+function lvRule(n) { var l = settings().roleLevels || DEFAULT_SETTINGS.roleLevels; return Object.assign({}, DEFAULT_SETTINGS.roleLevels[n - 1], l[n - 1] || {}); }
+/* the level a job needs in its role */
 function requiredLevel(j) {
   var k = svcKey(j);
   if (k === 'CLEANING') return ({ standard: 1, light: 1, general: 2, eot: 2, office: 2, deep: 3 })[(j.scope || {}).clean] || 1;
-  if (isInspK(k)) { var beds = +((j.propSnapshot || {}).bedrooms || propOf(j).bedrooms || 0); return beds >= 4 ? 5 : 4; }
-  return 0;
+  if (isInspK(k)) { var beds = +((j.propSnapshot || {}).bedrooms || propOf(j).bedrooms || 0); return beds <= 2 ? 1 : beds <= 4 ? 2 : 3; }
+  return 1;
 }
-function liveTrainings() { return list('trainings').filter(function (t) { return t.status === 'PUBLISHED'; }).sort(function (a, b) { return ((+a.level || 9) - (+b.level || 9)) || String(a.createdAt).localeCompare(String(b.createdAt)); }); }
-function trainingsForLevel(n) { return liveTrainings().filter(function (t) { return +t.level >= 2 && +t.level <= n; }); }
+/* in-role stats: completed jobs and average rating */
+function roleStats(proId, role) { var done = roleJobs(proId, role).filter(function (j) { return j.status === 'COMPLETED'; }), rated = done.filter(function (j) { return j.rating && !j.rating.hidden; }); return { completed: done.length, rating: rated.length ? rated.reduce(function (a, j) { return a + j.rating.score; }, 0) / rated.length : null, ratings: rated.length }; }
+/* trainings: role + level (0 = optional). Trainings from before roles used levels 2-5 */
+function tRole(t) { return t.role || (+t.level >= 4 ? 'CLERK' : +t.level >= 2 ? 'CLEANER' : ''); }
+function tLevel(t) { if (t.role) return +t.level || 0; var l = +t.level || 0; return l >= 5 ? 3 : l === 4 ? 1 : l >= 2 ? l : 0; }
+function liveTrainings() { return list('trainings').filter(function (t) { return t.status === 'PUBLISHED'; }).sort(function (a, b) { return String(tRole(a)).localeCompare(String(tRole(b))) || ((tLevel(a) || 9) - (tLevel(b) || 9)) || String(a.createdAt).localeCompare(String(b.createdAt)); }); }
+function trainingsFor(role, n) { return liveTrainings().filter(function (t) { return tRole(t) === role && tLevel(t) >= 1 && tLevel(t) <= n; }); }
 function doneAt(p, tid) { var x = (p && p.trainings || {})[tid]; return x && x.at ? x.at : null; }
-function missingTrainings(p, n) { return trainingsForLevel(n).filter(function (t) { return !doneAt(p, t.id); }); }
+function missingTrainings(p, role, n) { return trainingsFor(role, n).filter(function (t) { return !doneAt(p, t.id); }); }
 function proApps(proId) { return list('applications').filter(function (a) { return a.proId === proId; }).sort(byNew); }
-function pendingApp(proId, kind) { return proApps(proId).filter(function (a) { return a.status === 'PENDING' && (!kind || a.kind === kind); })[0] || null; }
+function appRole(a) { return a.role || (+a.to >= 4 ? 'CLERK' : 'CLEANER'); }
+function pendingApp(proId, kind, role) { return proApps(proId).filter(function (a) { return a.status === 'PENDING' && (!kind || a.kind === kind) && (!role || appRole(a) === role); })[0] || null; }
 function pendingApps() {
   var real = list('applications').filter(function (a) { return a.status === 'PENDING' && D.pros[a.proId]; });
   /* older Pros submitted before applications were recorded */
   list('pros').forEach(function (p) { if (p.status === 'PENDING' && !real.some(function (a) { return a.proId === p.id && a.kind === 'JOIN'; })) real.push({ id: 'join-' + p.id, proId: p.id, kind: 'JOIN', from: 0, to: 1, status: 'PENDING', createdAt: (p.onboarding || {}).submittedAt || p.createdAt, synthetic: true }); });
   return real.sort(byNew);
 }
-/* requirements to reach level n */
-function levelCheck(p, n) {
-  if (n > 5) return null;
-  var st = proStats(p.id), r = lvRule(n), cur = proLevel(p), tr = trainingsForLevel(n), td = tr.filter(function (t) { return doneAt(p, t.id); }).length;
+/* requirements to reach level n in a role */
+function levelCheck(p, role, n) {
+  if (n > 3) return null;
+  var st = roleStats(p.id, role), r = lvRule(n), cur = proLevel(p, role), tr = trainingsFor(role, n), td = tr.filter(function (t) { return doneAt(p, t.id); }).length, sc = standardsCheck(p, role);
   var rows = [
-    { k: 'prev', label: 'Hold Level ' + (n - 1), ok: cur >= n - 1, val: 'You’re Level ' + cur },
-    { k: 'jobs', label: r.minJobs + ' completed job' + (r.minJobs === 1 ? '' : 's'), ok: st.completed >= r.minJobs, val: st.completed + ' done' }
+    { k: 'prev', label: 'Hold ' + roleBadge(role, n - 1), ok: cur >= n - 1, val: 'You’re Level ' + cur },
+    { k: 'std', label: 'Pass the standards check (first ' + sc.n + ' jobs)', ok: sc.passed, val: sc.passed ? (sc.early ? 'Passed early' : 'Passed') : sc.done + ' of ' + sc.n + ' done' },
+    { k: 'jobs', label: r.minJobs + ' completed ' + ROLES[role].short.toLowerCase() + ' job' + (r.minJobs === 1 ? '' : 's'), ok: st.completed >= r.minJobs, val: st.completed + ' done' }
   ];
   if (r.minRating > 0) rows.push({ k: 'rating', label: 'Average rating of ' + (+r.minRating).toFixed(1) + ' or more', ok: st.rating != null && st.rating >= r.minRating, val: st.rating != null ? st.rating.toFixed(1) + ' from ' + st.ratings : 'No ratings yet' });
-  if (n >= 4 || tr.length) rows.push({ k: 'training', label: tr.length ? 'Complete ' + tr.length + ' required training' + (tr.length === 1 ? '' : 's') : 'Required trainings', ok: td === tr.length, val: tr.length ? td + ' of ' + tr.length + ' done' : 'None set yet' });
+  if (tr.length) rows.push({ k: 'training', label: 'Complete ' + tr.length + ' required training' + (tr.length === 1 ? '' : 's'), ok: td === tr.length, val: td + ' of ' + tr.length + ' done' });
   rows.push({ k: 'approved', label: 'Approved LISTD Pro', ok: p.status === 'APPROVED', val: p.status === 'APPROVED' ? 'Approved' : 'Not approved yet' });
-  return { n: n, rows: rows, ok: rows.every(function (x) { return x.ok; }), trainings: tr, done: td };
+  return { role: role, n: n, rows: rows, ok: rows.every(function (x) { return x.ok; }), trainings: tr, done: td };
 }
 function reqList(c) { return '<ul class="a-req">' + c.rows.map(function (x) { return '<li class="' + (x.ok ? 'ok' : 'no') + '">' + ic(x.ok ? 'success' : 'minus', 16) + '<span>' + esc(x.label) + '</span><em>' + esc(x.val) + '</em></li>'; }).join('') + '</ul>'; }
-function appTitle(a) { return a.kind === 'JOIN' ? 'Joining LISTD' : 'Level ' + a.from + ' → Level ' + a.to; }
+function appTitle(a) { return a.kind === 'JOIN' ? 'Joining LISTD' : ROLES[appRole(a)].label + ' · Level ' + (a.role ? a.from : legacyRoleLevel({ level: a.from }, appRole(a))) + ' → ' + (a.role ? a.to : legacyRoleLevel({ level: a.to }, appRole(a))); }
 function appBadge(a) { return badge({ PENDING: 'Waiting for review', APPROVED: 'Approved', REJECTED: 'Not approved', CHANGES: 'Changes requested', WITHDRAWN: 'Withdrawn' }[a.status] || a.status, a.status === 'APPROVED' ? 'success' : a.status === 'PENDING' ? 'warning' : a.status === 'REJECTED' ? 'danger' : ''); }
 function trainSrc(t) { return t.assetId ? '/_blob/' + t.assetId : t.dataUrl || t.url || ''; }
 function trainKind(t) { return { video: ['play', 'Video'], pdf: ['file', 'PDF'], link: ['external', 'Link'] }[t.kind] || ['file', 'File']; }
-function forLevel(t) { return +t.level >= 2 ? 'Level ' + t.level : 'Optional'; }
+function forLevel(t) { var r = tRole(t), l = tLevel(t); return r && l ? roleBadge(r, l) : 'Optional'; }
 
 /* ---------- commands ---------- */
-function cmdApplyLevel(note) {
-  var p = meP(), n = proLevel(p) + 1; if (n > 5) return deny('You’re already at the top level.');
-  if (pendingApp(p.id, 'LEVEL')) return deny('You already have an application waiting for review.');
-  var c = levelCheck(p, n); if (!c.ok) return deny('You don’t meet every requirement for Level ' + n + ' yet.');
-  var st = proStats(p.id);
-  setDoc('applications', uid(), { proId: p.id, kind: 'LEVEL', from: n - 1, to: n, status: 'PENDING', note: note || '', snapshot: { completed: st.completed, rating: st.rating, ratings: st.ratings, trainings: c.trainings.map(function (t) { return t.id; }) }, createdAt: now() });
-  notify('admin', p.name + ' applied for Level ' + n + ' (' + LEVEL_INFO[n].name + ')'); return true;
+function cmdApplyLevel(role, note) {
+  var p = meP(); if (!p || proRoles(p).indexOf(role) < 0) return deny('You don’t hold that role.');
+  var n = proLevel(p, role) + 1; if (n > 3) return deny('You’re already at the top level as a ' + ROLES[role].label + '.');
+  if (pendingApp(p.id, 'LEVEL', role)) return deny('You already have an application waiting for review.');
+  var c = levelCheck(p, role, n); if (!c.ok) return deny('You don’t meet every requirement for ' + roleBadge(role, n) + ' yet.');
+  var st = roleStats(p.id, role);
+  setDoc('applications', uid(), { proId: p.id, kind: 'LEVEL', role: role, from: n - 1, to: n, status: 'PENDING', note: note || '', snapshot: { completed: st.completed, rating: st.rating, ratings: st.ratings, trainings: c.trainings.map(function (t) { return t.id; }) }, createdAt: now() });
+  notify('admin', p.name + ' applied for ' + roleBadge(role, n)); return true;
 }
 function cmdWithdrawApp(id) { var a = D.applications[id]; if (!a || a.proId !== S.proId || a.status !== 'PENDING') return false; patchDoc('applications', id, { status: 'WITHDRAWN', decision: { reason: 'Withdrawn by Pro', at: now() } }); return true; }
-function trainingGate(p, n) { if (n < 4) return true; var m = missingTrainings(p, n); return m.length ? 'Level ' + n + ' needs ' + m.length + ' more training' + (m.length > 1 ? 's' : '') + ' completed first: ' + m.map(function (t) { return t.title; }).join(', ') + '.' : true; }
-function applyLevel(p, n, reason, appId) {
-  var hist2 = (p.levelHistory || []).concat([{ from: proLevel(p), to: n, reason: reason, appId: appId || null, at: now() }]);
-  patchDoc('pros', p.id, { level: n, levelOverride: null, levelHistory: hist2 });
-  audit('pro.level', 'pro', p.id, reason, { from: proLevel(p), to: n });
+function trainingGate(p, role, n) { var m = missingTrainings(p, role, n); return m.length ? roleBadge(role, n) + ' needs ' + m.length + ' more training' + (m.length > 1 ? 's' : '') + ' completed first: ' + m.map(function (t) { return t.title; }).join(', ') + '.' : true; }
+function levelsWith(p, role, n) { var l = {}; proRoles(p).forEach(function (r) { l[r] = proLevel(p, r); }); l[role] = n; return l; }
+function applyLevel(p, role, n, reason, appId) {
+  var from = proLevel(p, role), hist2 = (p.levelHistory || []).concat([{ role: role, from: from, to: n, reason: reason, appId: appId || null, at: now() }]);
+  patchDoc('pros', p.id, { levels: levelsWith(p, role, n), levelHistory: hist2 });
+  audit('pro.level', 'pro', p.id, reason, { role: role, from: from, to: n });
 }
 function cmdDecideApp(id, approve, reason) {
   var a = D.applications[id]; if (!a || a.status !== 'PENDING' || a.kind !== 'LEVEL') return deny('This application is no longer open.');
   var p = D.pros[a.proId]; if (!p) return false;
+  var role = appRole(a), to = a.role ? a.to : legacyRoleLevel({ level: a.to }, role), from = a.role ? a.from : legacyRoleLevel({ level: a.from }, role);
   if (!approve && !reason) return deny('Give a reason so the Pro knows what to work on.');
-  if (approve) { if (proLevel(p) !== a.from) return deny('This Pro’s level has changed since they applied.'); var g = trainingGate(p, a.to); if (g !== true) return deny(g); applyLevel(p, a.to, reason || 'Level application approved', id); }
+  if (approve) { if (proLevel(p, role) !== from) return deny('This Pro’s level has changed since they applied.'); var g = trainingGate(p, role, to); if (g !== true) return deny(g); applyLevel(p, role, to, reason || 'Level application approved', id); }
   patchDoc('applications', id, { status: approve ? 'APPROVED' : 'REJECTED', decision: { by: ENV.uid || 'admin', reason: reason || '', at: now() } });
-  if (!approve) audit('pro.level_reject', 'pro', p.id, reason, { to: a.to });
-  notify('p:' + p.id, approve ? 'You’re now Level ' + a.to + ' (' + LEVEL_INFO[a.to].name + '). New job types are open to you.' : 'Your Level ' + a.to + ' application wasn’t approved: ' + reason);
+  if (!approve) audit('pro.level_reject', 'pro', p.id, reason, { role: role, to: to });
+  notify('p:' + p.id, approve ? 'You’re now ' + roleBadge(role, to) + '. ' + ROLES[role].unlocks[to] + ' are open to you.' : 'Your ' + roleBadge(role, to) + ' application wasn’t approved: ' + reason);
   return true;
 }
-function cmdSetLevel(proId, n, reason) {
-  var p = D.pros[proId]; if (!p) return false; if (!reason) return deny('Give a reason for the level change.');
-  if (n === proLevel(p)) return deny('That’s already their level.');
-  var g = trainingGate(p, n); if (g !== true) return deny(g);
-  applyLevel(p, n, reason); pendingApp(proId, 'LEVEL') && patchDoc('applications', pendingApp(proId, 'LEVEL').id, { status: n >= pendingApp(proId, 'LEVEL').to ? 'APPROVED' : 'REJECTED', decision: { by: ENV.uid || 'admin', reason: 'Level set directly: ' + reason, at: now() } });
-  notify('p:' + proId, 'LISTD set your level to Level ' + n + ' (' + LEVEL_INFO[n].name + ').'); return true;
+function cmdSetLevel(proId, role, n, reason) {
+  var p = D.pros[proId]; if (!p || !ROLES[role]) return false; if (!reason) return deny('Give a reason for the level change.');
+  n = Math.min(3, Math.max(1, +n || 1)); if (n === proLevel(p, role)) return deny('That’s already their level.');
+  var g = trainingGate(p, role, n); if (g !== true) return deny(g);
+  applyLevel(p, role, n, reason); var pa = pendingApp(proId, 'LEVEL', role); pa && patchDoc('applications', pa.id, { status: n >= pa.to ? 'APPROVED' : 'REJECTED', decision: { by: ENV.uid || 'admin', reason: 'Level set directly: ' + reason, at: now() } });
+  notify('p:' + proId, 'LISTD set your level to ' + roleBadge(role, n) + '.'); return true;
+}
+/* experienced Pros can pass the standards check early and move up faster */
+function cmdPassStandards(proId, role, reason) {
+  var p = D.pros[proId]; if (!p || !ROLES[role]) return false; if (!reason) return deny('Give a reason, for example their experience.');
+  var st = Object.assign({}, p.standards || {}); st[role] = { at: now(), by: ENV.uid || 'admin', reason: reason }; patchDoc('pros', proId, { standards: st });
+  audit('pro.standards_pass', 'pro', proId, reason, { role: role }); notify('p:' + proId, 'You’ve passed the LISTD standards check as a ' + ROLES[role].label + '.'); return true;
 }
 function cmdCompleteTraining(tid) { var p = meP(), t = D.trainings[tid]; if (!p || !t) return false; var tr = Object.assign({}, p.trainings || {}); tr[tid] = { at: now(), title: t.title }; patchDoc('pros', p.id, { trainings: tr }); return true; }
 function cmdTrainingStatus(tid, status) { var t = D.trainings[tid]; if (!t) return false; patchDoc('trainings', tid, { status: status }); audit('training.' + status.toLowerCase(), 'training', tid, t.title); return true; }
@@ -3659,22 +3738,22 @@ async function trainingFile(file) {
   } catch (e) { toast('The file couldn’t be uploaded. Try again or add a link.'); }
 }
 function trainingAdd(fd) {
-  var v = function (n) { return String(fd.get(n) || '').trim(); }, up = S.tUp, link = v('link');
+  var v = function (n) { return String(fd.get(n) || '').trim(); }, up = S.tUp, link = v('link'), req = v('level').split(':');
   if (!v('title')) return deny('Give the training a title.');
   if (!up && !link) return deny('Upload a video or PDF, or add a link.');
   if (link && !/^https:\/\//i.test(link)) return deny('Links must start with https://');
-  var doc = { title: v('title'), desc: v('desc'), level: +v('level') || 0, minutes: Math.max(0, +v('minutes') || 0), status: fd.get('publish') ? 'PUBLISHED' : 'DRAFT', createdAt: now() };
+  var role = ROLES[req[0]] ? req[0] : '', doc = { title: v('title'), desc: v('desc'), role: role, level: role ? Math.min(3, Math.max(1, +req[1] || 1)) : 0, minutes: Math.max(0, +v('minutes') || 0), status: fd.get('publish') ? 'PUBLISHED' : 'DRAFT', createdAt: now() };
   if (up) Object.assign(doc, { kind: up.kind, fileName: up.name, size: up.size }, up.assetId ? { assetId: up.assetId } : { dataUrl: up.dataUrl }); else Object.assign(doc, { kind: 'link', url: link });
-  var id = uid(); setDoc('trainings', id, doc); audit('training.create', 'training', id, doc.title, { level: doc.level, kind: doc.kind });
-  if (doc.status === 'PUBLISHED') list('pros').filter(function (p) { return p.status === 'APPROVED'; }).forEach(function (p) { notify('p:' + p.id, 'New training: ' + doc.title + (doc.level ? ' (needed for Level ' + doc.level + ')' : '')); });
+  var id = uid(); setDoc('trainings', id, doc); audit('training.create', 'training', id, doc.title, { role: doc.role, level: doc.level, kind: doc.kind });
+  if (doc.status === 'PUBLISHED') list('pros').filter(function (p) { return p.status === 'APPROVED' && (!role || proRoles(p).indexOf(role) >= 0); }).forEach(function (p) { notify('p:' + p.id, 'New training: ' + doc.title + (role ? ' (needed for ' + roleBadge(role, doc.level) + ')' : '')); });
   S.tUp = null; return true;
 }
 
 /* ---------- shared pieces ---------- */
-function ladder(cur) {
-  return '<ol class="a-ladder">' + [1, 2, 3, 4, 5].map(function (n) { var r = lvRule(n); return '<li class="' + (n === cur ? 'cur' : n < cur ? 'past' : '') + (n >= 4 ? ' insp' : '') + '"><span class="n">' + n + '</span><span class="t"><b>' + esc(LEVEL_INFO[n].name) + '</b><span>' + esc(LEVEL_INFO[n].unlocks) + '</span></span><span class="pay">' + pounds(proRate(n)) + '<small>per hour</small></span></li>'; }).join('') + '</ol>';
+function ladder(role, cur) {
+  return '<ol class="a-ladder">' + [1, 2, 3].map(function (n) { return '<li class="' + (n === cur ? 'cur' : n < cur ? 'past' : '') + '"><span class="n">' + n + '</span><span class="t"><b>' + esc(roleBadge(role, n)) + '</b><span>' + esc(ROLES[role].unlocks[n]) + '</span></span><span class="pay">' + pounds(proRate(role, n)) + '<small>per hour</small></span></li>'; }).join('') + '</ol>';
 }
-function trainingRow(t, p, go) {
+function trainingRow(t, p) {
   var k = trainKind(t), d = p ? doneAt(p, t.id) : null;
   return '<button type="button" class="a-trow" data-go="training" data-id="' + t.id + '"><span class="ic">' + ic(k[0], 20) + '</span><span class="t"><b>' + esc(t.title) + '</b><span>' + k[1] + (t.minutes ? ' · ' + t.minutes + ' min' : '') + ' · ' + forLevel(t) + '</span></span>' + (p ? (d ? badge('Completed ' + fdate(d), 'success', 'check') : badge('To do', '')) : '') + ic('chevron-right', 18) + '</button>';
 }
@@ -3684,28 +3763,33 @@ function trainingPlayer(t) {
   if (t.kind === 'pdf') return '<iframe class="a-pdfview" src="' + esc(src) + '" title="' + esc(t.title) + '"></iframe><p><a class="ld-btn ld-btn-secondary ld-btn-sm" href="' + esc(src) + '" target="_blank" rel="noopener" download="' + esc(t.fileName || 'training.pdf') + '">' + ic('download', 16) + ' Open the PDF</a></p>';
   return '<div class="a-card a-linkcard">' + ic('external', 22) + '<div><b>This training is hosted elsewhere</b><p class="a-fine">' + esc(t.url) + '</p></div><a class="ld-btn ld-btn-primary ld-btn-sm" href="' + esc(t.url) + '" target="_blank" rel="noopener">Open training</a></div>';
 }
+function roleOptions() { return ROLE_KEYS.reduce(function (a, r) { return a.concat([1, 2, 3].map(function (n) { return [r + ':' + n, roleBadge(r, n)]; })); }, []).concat([['0', 'Optional, not required']]); }
 
 /* ---------- Pro: training & level ---------- */
-function vProTraining() {
-  var p = meP(), cur = proLevel(p), n = cur + 1, c = levelCheck(p, n), pend = pendingApp(p.id, 'LEVEL'), last = proApps(p.id).filter(function (a) { return a.kind === 'LEVEL' && a.status !== 'PENDING'; })[0], ts = liveTrainings();
-  var h = '<div class="a-page" style="max-width:920px"><div class="a-head"><div><h1>Training & level</h1><p>Your level decides which jobs LISTD can offer you and the hourly rate used to work out your fee for each job.</p></div></div>';
-  h += '<div class="a-card a-lvcard"><div class="a-row sb"><div>' + levelBar(cur, LEVEL_INFO[cur].name) + '<p style="margin-top:8px"><b>You can take:</b> ' + esc(LEVEL_INFO[cur].unlocks) + '.</p><p class="a-fine">Hourly rate: ' + P(proRate(cur)) + '. Each job’s fee covers attendance, expected on-site and reporting time, and any agreed complexity or Priority allowance. You see the fee before you accept.</p></div></div>';
+function roleCard(p, role) {
+  var cur = proLevel(p, role), n = cur + 1, c = levelCheck(p, role, n), pend = pendingApp(p.id, 'LEVEL', role), last = proApps(p.id).filter(function (a) { return a.kind === 'LEVEL' && appRole(a) === role && a.status !== 'PENDING'; })[0], sc = standardsCheck(p, role);
+  var h = '<div class="a-card a-lvcard" id="role-' + role + '"><div class="a-row sb"><div>' + levelBar(cur, roleBadge(role, cur)) + newBadge(p, role) + '<p style="margin-top:8px"><b>You can take:</b> ' + esc(ROLES[role].unlocks[cur]) + '.</p><p class="a-fine">Hourly rate: ' + P(proRate(role, cur)) + ', set by LISTD for this role and level. Each job’s fee covers attendance, expected on-site and reporting time, and any agreed complexity or Priority allowance. You see the fee before you accept.</p>' +
+    (sc.passed ? '' : '<p class="a-fine"><b>Standards check:</b> your first ' + sc.n + ' ' + ROLES[role].short.toLowerCase() + ' jobs get a closer LISTD review (' + sc.done + ' of ' + sc.n + ' done).</p>') + '</div></div>';
   if (c) {
-    h += '<div class="a-next"><h3>Next: Level ' + n + ' · ' + esc(LEVEL_INFO[n].name) + '</h3><p class="a-fine">Unlocks ' + esc(LEVEL_INFO[n].unlocks.charAt(0).toLowerCase() + LEVEL_INFO[n].unlocks.slice(1)) + ', at ' + P(proRate(n)) + ' an hour.</p>' + reqList(c);
+    h += '<div class="a-next"><h3>Next: ' + esc(roleBadge(role, n)) + '</h3><p class="a-fine">Unlocks ' + esc(ROLES[role].unlocks[n].charAt(0).toLowerCase() + ROLES[role].unlocks[n].slice(1)) + ', at ' + P(proRate(role, n)) + ' an hour.</p>' + reqList(c);
     if (pend) h += banner('clock', 'Application sent ' + fdate(pend.createdAt), 'LISTD will review it and let you know.', '<button class="ld-btn ld-btn-secondary ld-btn-sm" data-act="app-withdraw" data-id="' + pend.id + '">Withdraw</button>', 'warning');
-    else h += '<form class="a-form" data-form="apply-level"><input type="hidden" name="to" value="' + n + '">' + (c.ok ? field('ap-note', 'Anything you’d like LISTD to know? <small>Optional</small>', inp('ap-note', 'note', '', 'maxlength="300"')) : '') + '<div class="a-actions"><button class="ld-btn ld-btn-primary" type="submit"' + (c.ok ? '' : ' disabled') + '>Apply for Level ' + n + '</button>' + (c.ok ? '' : '<span class="a-fine">Complete the items above to apply.</span>') + '</div></form>';
+    else h += '<form class="a-form" data-form="apply-level"><input type="hidden" name="role" value="' + role + '">' + (c.ok ? field('ap-note-' + role, 'Anything you’d like LISTD to know? <small>Optional</small>', inp('ap-note-' + role, 'note', '', 'maxlength="300"')) : '') + '<div class="a-actions"><button class="ld-btn ld-btn-primary" type="submit"' + (c.ok ? '' : ' disabled') + '>Apply for ' + esc(roleBadge(role, n)) + '</button>' + (c.ok ? '' : '<span class="a-fine">Complete the items above to apply.</span>') + '</div></form>';
     if (last && last.status === 'REJECTED' && !pend) h += '<p class="a-fine" style="color:var(--danger)">Your last application (' + fdate(last.createdAt) + ') wasn’t approved: ' + esc(last.decision && last.decision.reason || '') + '</p>';
     h += '</div>';
-  } else h += '<p class="a-fine" style="margin-top:8px">You’re at the top level.</p>';
-  h += '</div>';
-  h += '<section class="a-sec"><h2>All levels</h2>' + ladder(cur) + '<p class="a-fine">Repairs & Damages jobs are approved separately as a trade skill and aren’t part of the levels.</p></section>';
-  var groups = [[4, 'Needed for Level 4'], [5, 'Needed for Level 5'], [2, 'Needed for Level 2'], [3, 'Needed for Level 3'], [0, 'Optional']];
-  h += '<section class="a-sec"><h2>Trainings <span class="a-fine">' + ts.filter(function (t) { return doneAt(p, t.id); }).length + ' of ' + ts.length + ' completed</span></h2>' + (ts.length ? groups.map(function (g) { var x = ts.filter(function (t) { return (+t.level || 0) === g[0]; }); return x.length ? '<div class="a-tgroup"><h3>' + g[1] + '</h3><div class="a-card" style="padding:0">' + x.map(function (t) { return trainingRow(t, p); }).join('') + '</div></div>' : ''; }).join('') : empty('training', 'No trainings yet', 'LISTD will add videos and guides here. You’ll get a notification when one is published.', '')) + '</section>';
+  } else h += '<p class="a-fine" style="margin-top:8px">You’re at the top level in this role.</p>';
+  return h + '<details><summary>All ' + esc(ROLES[role].label) + ' levels</summary>' + ladder(role, cur) + '</details></div>';
+}
+function vProTraining() {
+  var p = meP(), roles = proRoles(p), ts = liveTrainings().filter(function (t) { return !tRole(t) || roles.indexOf(tRole(t)) >= 0; });
+  var h = '<div class="a-page" style="max-width:920px"><div class="a-head"><div><h1>Training & level</h1><p>You work in ' + (roles.length ? roles.map(function (r) { return ROLES[r].label; }).join(', ') : 'no role yet') + '. Each role has three levels. Your level in a role decides which of those jobs you can take and the hourly rate used for your fee.</p></div></div>';
+  h += roles.length ? roles.map(function (r) { return roleCard(p, r); }).join('') : empty('star', 'No role yet', 'Choose the services you deliver in Settings › Work to hold a role.', '');
+  var groups = roles.map(function (r) { return [r, 'Needed as a ' + ROLES[r].label]; }).concat([['', 'Optional']]);
+  h += '<section class="a-sec"><h2>Trainings <span class="a-fine">' + ts.filter(function (t) { return doneAt(p, t.id); }).length + ' of ' + ts.length + ' completed</span></h2>' + (ts.length ? groups.map(function (g) { var x = ts.filter(function (t) { return g[0] ? tRole(t) === g[0] && tLevel(t) : !tRole(t) || !tLevel(t); }); return x.length ? '<div class="a-tgroup"><h3>' + g[1] + '</h3><div class="a-card" style="padding:0">' + x.map(function (t) { return trainingRow(t, p); }).join('') + '</div></div>' : ''; }).join('') : empty('training', 'No trainings yet', 'LISTD will add videos and guides here. You’ll get a notification when one is published.', '')) + '</section>';
   return h + '</div>';
 }
 function vTraining() {
   var t = D.trainings[S.params.id]; if (!t) return '<div class="a-page">' + empty('training', 'Training not found', 'It may have been removed.', '<button class="ld-btn ld-btn-secondary" data-act="back">Back</button>') + '</div>';
-  var k = trainKind(t), h = '<div class="a-page" style="max-width:920px"><button class="a-back" data-act="back">' + ic('arrow-left', 16) + ' Back</button><div class="a-head"><div><h1>' + esc(t.title) + '</h1><p>' + k[1] + (t.minutes ? ' · about ' + t.minutes + ' minutes' : '') + ' · ' + (+t.level >= 2 ? 'Needed for Level ' + t.level : 'Optional') + (S.role === 'admin' && t.status !== 'PUBLISHED' ? ' · ' + (t.status === 'DRAFT' ? 'Draft, not visible to Pros' : 'Archived') : '') + '</p></div></div>';
+  var k = trainKind(t), h = '<div class="a-page" style="max-width:920px"><button class="a-back" data-act="back">' + ic('arrow-left', 16) + ' Back</button><div class="a-head"><div><h1>' + esc(t.title) + '</h1><p>' + k[1] + (t.minutes ? ' · about ' + t.minutes + ' minutes' : '') + ' · ' + (tLevel(t) ? 'Needed for ' + forLevel(t) : 'Optional') + (S.role === 'admin' && t.status !== 'PUBLISHED' ? ' · ' + (t.status === 'DRAFT' ? 'Draft, not visible to Pros' : 'Archived') : '') + '</p></div></div>';
   if (t.desc) h += '<p>' + esc(t.desc) + '</p>';
   h += trainingPlayer(t);
   if (S.role === 'pro') {
@@ -3713,36 +3797,37 @@ function vTraining() {
     h += d ? banner('success', 'Completed ' + fdate(d, true), 'This counts towards your level requirements.', '', 'brand') : '<form class="a-card a-form" data-form="training-done" data-id="' + t.id + '"><label class="ld-check"><input type="checkbox" name="confirm" id="td-confirm" required><span>I’ve ' + (t.kind === 'pdf' ? 'read' : 'watched') + ' this training in full and understood it</span></label><div class="a-actions"><button class="ld-btn ld-btn-primary" type="submit">Mark as complete</button></div></form>';
   } else {
     var done = list('pros').filter(function (p) { return doneAt(p, t.id); });
-    h += '<section class="a-sec"><h2>Completed by <span class="a-fine">' + done.length + ' Pro' + (done.length === 1 ? '' : 's') + '</span></h2>' + (done.length ? '<div class="a-tw"><table><thead><tr><th>Pro</th><th>Level</th><th>Completed</th></tr></thead><tbody>' + done.map(function (p) { return '<tr class="click" data-go="pro" data-id="' + p.id + '"><td>' + esc(p.name) + '</td><td>Level ' + proLevel(p) + '</td><td>' + fdate(doneAt(p, t.id), true) + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<p class="a-muted">No one has completed it yet.</p>') + '</section>';
+    h += '<section class="a-sec"><h2>Completed by <span class="a-fine">' + done.length + ' Pro' + (done.length === 1 ? '' : 's') + '</span></h2>' + (done.length ? '<div class="a-tw"><table><thead><tr><th>Pro</th><th>Roles</th><th>Completed</th></tr></thead><tbody>' + done.map(function (p) { return '<tr class="click" data-go="pro" data-id="' + p.id + '"><td>' + esc(p.name) + '</td><td>' + esc(proStats(p.id).levelName) + '</td><td>' + fdate(doneAt(p, t.id), true) + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<p class="a-muted">No one has completed it yet.</p>') + '</section>';
   }
   return h + '</div>';
 }
 
 /* ---------- Admin: Pros table ---------- */
+function roleChips(p) { return proRoles(p).map(function (r) { return '<span class="a-lvchip" title="' + esc(roleBadge(r, proLevel(p, r))) + '">' + ROLES[r].short + ' L' + proLevel(p, r) + '</span>' + (standardsCheck(p, r).passed ? '' : '<span class="a-fine"> new</span>'); }).join(' ') || '—'; }
 function vAdminPros() {
   var tab = S.ptab || 'all', apps = pendingApps(), q = (S.search || '').toLowerCase();
   var ps = list('pros').filter(function (p) {
     if (S.pst && S.pst !== 'all' && p.status !== S.pst) return false;
-    if (S.plv && S.plv !== 'all' && String(proLevel(p)) !== S.plv) return false;
+    if (S.plv && S.plv !== 'all' && proRoles(p).indexOf(S.plv) < 0) return false;
     if (q && [p.name, p.email, p.phone, p.status, (p.coverage || []).join(' ')].join(' ').toLowerCase().indexOf(q) < 0) return false;
     return true;
   }).sort(function (a, b) { var o = { PENDING: 0, RESUBMIT: 1, INVITED: 2, APPROVED: 3, DRAFT: 4, SUSPENDED: 5, REJECTED: 6 }; return ((o[a.status] || 9) - (o[b.status] || 9)) || String(a.name).localeCompare(String(b.name)); });
-  var h = '<div class="a-page"><div class="a-head"><div><h1>Pros</h1><p>' + list('pros').length + ' Pros · ' + list('pros').filter(function (p) { return p.status === 'APPROVED'; }).length + ' approved. Select a Pro to see their details, documents, level and training.</p></div><button type="button" class="ld-btn ld-btn-primary" data-act="pro-add">' + ic('plus', 18) + ' Add Pro</button></div>';
+  var h = '<div class="a-page"><div class="a-head"><div><h1>Pros</h1><p>' + list('pros').length + ' Pros · ' + list('pros').filter(function (p) { return p.status === 'APPROVED'; }).length + ' approved. Select a Pro to see their details, documents, roles, levels and training.</p></div><button type="button" class="ld-btn ld-btn-primary" data-act="pro-add">' + ic('plus', 18) + ' Add Pro</button></div>';
   h += '<div class="a-segtabs" role="tablist" aria-label="Pros views"><button type="button" role="tab" data-act="ptab" data-t="all" aria-selected="' + (tab === 'all') + '">All Pros</button><button type="button" role="tab" data-act="ptab" data-t="apps" aria-selected="' + (tab === 'apps') + '">Applications' + (apps.length ? '<span class="cnt">' + apps.length + '</span>' : '') + '</button></div>';
   if (tab === 'apps') {
     var hist3 = list('applications').filter(function (a) { return a.status !== 'PENDING' && D.pros[a.proId]; }).sort(byNew).slice(0, 30);
-    h += '<section class="a-sec"><h2>Waiting for review</h2>' + (apps.length ? appTable(apps, true) : empty('verified-pro', 'No applications waiting', 'New Pro applications and level-up requests appear here.', '')) + '</section>';
+    h += '<section class="a-sec"><h2>Waiting for review</h2>' + (apps.length ? appTable(apps, true) : empty('verified-pro', 'No applications waiting', 'New Pro applications and level-up applications appear here.', '')) + '</section>';
     if (hist3.length) h += '<section class="a-sec"><h2>Decided</h2>' + appTable(hist3, false) + '</section>';
     return h + '</div>';
   }
-  h += '<div class="a-row"><label class="sr-only" for="f-pst">Status</label><select class="a-mini" id="f-pst" data-filt="pst"><option value="all">All statuses</option>' + [['APPROVED', 'Approved'], ['INVITED', 'Invited'], ['PENDING', 'Under review'], ['RESUBMIT', 'Changes requested'], ['DRAFT', 'Application not finished'], ['SUSPENDED', 'Suspended'], ['REJECTED', 'Not approved']].map(function (o) { return '<option value="' + o[0] + '"' + (S.pst === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select><label class="sr-only" for="f-plv">Level</label><select class="a-mini" id="f-plv" data-filt="plv"><option value="all">All levels</option>' + [1, 2, 3, 4, 5].map(function (n) { return '<option value="' + n + '"' + (S.plv === String(n) ? ' selected' : '') + '>Level ' + n + ' · ' + LEVEL_INFO[n].name + '</option>'; }).join('') + '</select><label class="sr-only" for="f-pq">Search</label><input class="a-mini" id="f-pq" data-filt="search" type="search" placeholder="Search name, email, area" value="' + esc(S.search || '') + '"></div>';
+  h += '<div class="a-row"><label class="sr-only" for="f-pst">Status</label><select class="a-mini" id="f-pst" data-filt="pst"><option value="all">All statuses</option>' + [['APPROVED', 'Approved'], ['INVITED', 'Invited'], ['PENDING', 'Under review'], ['RESUBMIT', 'Changes requested'], ['DRAFT', 'Application not finished'], ['SUSPENDED', 'Suspended'], ['REJECTED', 'Not approved']].map(function (o) { return '<option value="' + o[0] + '"' + (S.pst === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select><label class="sr-only" for="f-plv">Role</label><select class="a-mini" id="f-plv" data-filt="plv"><option value="all">All roles</option>' + ROLE_KEYS.map(function (r) { return '<option value="' + r + '"' + (S.plv === r ? ' selected' : '') + '>' + ROLES[r].label + '</option>'; }).join('') + '</select><label class="sr-only" for="f-pq">Search</label><input class="a-mini" id="f-pq" data-filt="search" type="search" placeholder="Search name, email, area" value="' + esc(S.search || '') + '"></div>';
   if (!ps.length) return h + empty('verified-pro', list('pros').length ? 'No Pros match' : 'No Pros yet', list('pros').length ? 'Try another filter.' : 'Pros appear here when they start an application.', '') + '</div>';
-  var cols = [12, 18, 12, 12, 10, 7, 8, 10, 11];
+  var cols = [12, 18, 15, 12, 10, 6, 7, 9, 11];
   var cell = function (html, text, cls) { return '<td' + (cls ? ' class="' + cls + '"' : '') + ' title="' + esc(text) + '"><span class="clip">' + html + '</span></td>'; };
-  h += '<div class="a-tw a-clip"><table><colgroup>' + cols.map(function (w) { return '<col style="width:' + w + '%">'; }).join('') + '</colgroup><thead><tr><th>Pro</th><th>Email</th><th>Level</th><th>Services</th><th>Coverage</th><th class="r">Jobs</th><th class="r">Rating</th><th>Training</th><th>Status</th></tr></thead><tbody>' + ps.map(function (p) {
-    var st = proStats(p.id), lv = proLevel(p), nx = lv < 5 ? trainingsForLevel(lv + 1) : [], nd = nx.filter(function (t) { return doneAt(p, t.id); }).length, all = liveTrainings(), ad = all.filter(function (t) { return doneAt(p, t.id); }).length, pa = pendingApp(p.id) || (p.status === 'PENDING' ? { kind: 'JOIN' } : null);
+  h += '<div class="a-tw a-clip"><table><colgroup>' + cols.map(function (w) { return '<col style="width:' + w + '%">'; }).join('') + '</colgroup><thead><tr><th>Pro</th><th>Email</th><th>Roles & levels</th><th>Services</th><th>Coverage</th><th class="r">Jobs</th><th class="r">Rating</th><th>Training</th><th>Status</th></tr></thead><tbody>' + ps.map(function (p) {
+    var st = proStats(p.id), all = liveTrainings(), ad = all.filter(function (t) { return doneAt(p, t.id); }).length, pa = pendingApp(p.id) || (p.status === 'PENDING' ? { kind: 'JOIN' } : null);
     var svc = (p.skills || []).map(function (s) { return SKILLS[s].label.replace(' inspections', ''); }).join(', ');
-    return '<tr class="click" data-go="pro" data-id="' + p.id + '">' + cell('<b>' + esc(p.name || '—') + '</b>', p.name || '') + cell(esc(p.email || '—'), p.email || '') + cell('<span class="a-lvchip">L' + lv + '</span> ' + esc(LEVEL_INFO[lv].name) + (pa && pa.kind === 'LEVEL' ? ' ' + badge('Applied', 'warning') : ''), 'Level ' + lv + ' · ' + LEVEL_INFO[lv].name + (pa && pa.kind === 'LEVEL' ? ' · applied for Level ' + (lv + 1) : '')) + cell(esc(svc || '—'), svc) + cell(esc((p.coverage || []).join(', ') || '—'), (p.coverage || []).join(', ')) + cell(st.completed, st.completed, 'r num') + cell(st.rating != null ? st.rating.toFixed(1) : '—', st.rating != null ? st.rating.toFixed(2) : 'No ratings', 'r num') + cell(all.length ? ad + ' of ' + all.length + (nx.length && lv < 5 ? ' <span class="a-fine">· L' + (lv + 1) + ': ' + nd + '/' + nx.length + '</span>' : '') : '—', all.length ? ad + ' of ' + all.length + ' trainings completed' : 'No trainings published') + cell(proStatusBadge(p), proStatusLabel(p)) + '</tr>';
+    return '<tr class="click" data-go="pro" data-id="' + p.id + '">' + cell('<b>' + esc(p.name || '—') + '</b>', p.name || '') + cell(esc(p.email || '—'), p.email || '') + cell(roleChips(p) + (pa && pa.kind === 'LEVEL' ? ' ' + badge('Applied', 'warning') : ''), st.levelName + (pa && pa.kind === 'LEVEL' ? ' · applied for ' + appTitle(pa) : '')) + cell(esc(svc || '—'), svc) + cell(esc((p.coverage || []).join(', ') || '—'), (p.coverage || []).join(', ')) + cell(st.completed, st.completed, 'r num') + cell(st.rating != null ? st.rating.toFixed(1) : '—', st.rating != null ? st.rating.toFixed(2) : 'No ratings', 'r num') + cell(all.length ? ad + ' of ' + all.length : '—', all.length ? ad + ' of ' + all.length + ' trainings completed' : 'No trainings published') + cell(proStatusBadge(p), proStatusLabel(p)) + '</tr>';
   }).join('') + '</tbody></table></div>';
   return h + '</div>';
 }
@@ -3751,42 +3836,48 @@ function proStatusBadge(p) { return badge(proStatusLabel(p), p.status === 'APPRO
 function appTable(apps, open) {
   return '<div class="a-tw"><table><thead><tr><th>Pro</th><th>Application</th><th>' + (open ? 'Submitted' : 'Decided') + '</th><th>' + (open ? 'Requirements' : 'Reason') + '</th><th>Status</th></tr></thead><tbody>' + apps.map(function (a) {
     var p = D.pros[a.proId], req = '';
-    if (open) { if (a.kind === 'JOIN') { var miss = DOCS.filter(function (d) { return d[2] && !(p.docs || []).some(function (x) { return x.type === d[0]; }); }); req = miss.length ? badge(miss.length + ' document' + (miss.length > 1 ? 's' : '') + ' missing', 'warning') : badge('Documents uploaded', 'success'); } else { var c = levelCheck(p, a.to); req = c.ok ? badge('All met', 'success') : badge(c.rows.filter(function (x) { return !x.ok; }).length + ' not met', 'danger'); } }
+    if (open) { if (a.kind === 'JOIN') { var miss = docsMissing(p); req = miss.length ? badge(miss.length + ' document' + (miss.length > 1 ? 's' : '') + ' missing', 'warning') : badge('Documents uploaded', 'success'); } else { var c = levelCheck(p, appRole(a), a.role ? a.to : legacyRoleLevel({ level: a.to }, appRole(a))); req = !c ? badge('Top level', '') : c.ok ? badge('All met', 'success') : badge(c.rows.filter(function (x) { return !x.ok; }).length + ' not met', 'danger'); } }
     else req = '<span class="a-fine">' + esc((a.decision || {}).reason || '') + '</span>';
-    return '<tr class="click" data-go="pro" data-id="' + a.proId + '"><td><b>' + esc(p.name) + '</b><div class="a-fine">' + esc(p.email || '') + '</div></td><td>' + esc(appTitle(a)) + (a.kind === 'LEVEL' ? '<div class="a-fine">' + esc(LEVEL_INFO[a.to].name) + '</div>' : '') + '</td><td>' + fdate(open ? a.createdAt : (a.decision || {}).at || a.updatedAt, true) + '</td><td>' + req + '</td><td>' + appBadge(a) + '</td></tr>';
+    return '<tr class="click" data-go="pro" data-id="' + a.proId + '"><td><b>' + esc(p.name) + '</b><div class="a-fine">' + esc(p.email || '') + '</div></td><td>' + esc(appTitle(a)) + '</td><td>' + fdate(open ? a.createdAt : (a.decision || {}).at || a.updatedAt, true) + '</td><td>' + req + '</td><td>' + appBadge(a) + '</td></tr>';
   }).join('') + '</tbody></table></div>';
 }
 
 /* ---------- Admin: one Pro ---------- */
+function roleLevelSection(p, role) {
+  var lv = proLevel(p, role), c = levelCheck(p, role, lv + 1), sc = standardsCheck(p, role), rs = roleStats(p.id, role);
+  return '<div class="a-pdlevel" id="pd-level-' + role + '"><div>' + levelBar(lv, roleBadge(role, lv)) + newBadge(p, role) + '<p style="margin-top:8px">' + esc(ROLES[role].unlocks[lv]) + '. ' + rs.completed + ' completed ' + ROLES[role].short.toLowerCase() + ' job' + (rs.completed === 1 ? '' : 's') + (rs.rating != null ? ' · ' + rs.rating.toFixed(1) + ' rating' : '') + '.</p><p class="a-fine">Hourly rate ' + P(proRate(role, lv)) + ' for workload-based fees.</p>' +
+    '<p class="a-fine"><b>Standards check:</b> ' + esc(sc.label) + (sc.early ? ' (passed early: ' + esc(sc.early.reason) + ')' : '') + '</p>' + (c ? '<h4>Requirements for ' + esc(roleBadge(role, lv + 1)) + '</h4>' + reqList(c) : '<p class="a-fine">At the top level in this role.</p>') + '</div>' +
+    '<div style="display:grid;gap:12px"><form class="a-form a-subcard" data-form="set-level" data-id="' + p.id + '"><input type="hidden" name="role" value="' + role + '"><h4>Change ' + esc(ROLES[role].label) + ' level</h4>' + field('sl-' + p.id + '-' + role, 'New level', sel('sl-' + p.id + '-' + role, 'level', [1, 2, 3].map(function (n) { var g = trainingGate(p, role, n); return [n, roleBadge(role, n) + (g !== true ? ' (training not done)' : '')]; }), lv)) + field('slr-' + p.id + '-' + role, 'Reason', inp('slr-' + p.id + '-' + role, 'reason', '', 'required'), 'Recorded in the audit log. Required trainings must be completed first.') + '<div class="a-actions"><button class="ld-btn ld-btn-secondary ld-btn-sm" type="submit">Save level</button></div></form>' +
+    (sc.passed ? '' : '<form class="a-form a-subcard" data-form="std-pass" data-id="' + p.id + '"><input type="hidden" name="role" value="' + role + '"><h4>Pass the standards check early</h4><p class="a-fine">For experienced Pros, so they can move up faster.</p>' + field('sp-' + p.id + '-' + role, 'Reason', inp('sp-' + p.id + '-' + role, 'reason', '', 'required placeholder="e.g. 5 years as an inventory clerk, references checked"')) + '<div class="a-actions"><button class="ld-btn ld-btn-secondary ld-btn-sm" type="submit">Mark as passed</button></div></form>') + '</div></div>';
+}
 function vAdminPro() {
   var p = D.pros[S.params.id]; if (!p) return '<div class="a-page">' + empty('verified-pro', 'Pro not found', '', '<button class="ld-btn ld-btn-secondary" data-go="pros">All Pros</button>') + '</div>';
-  var st = proStats(p.id), lv = proLevel(p), apps = proApps(p.id), join = p.status === 'PENDING' || p.status === 'RESUBMIT', pl = pendingApp(p.id, 'LEVEL'), ts = liveTrainings(), today = new Date().toISOString().slice(0, 10);
+  var st = proStats(p.id), roles = proRoles(p), apps = proApps(p.id), join = p.status === 'PENDING' || p.status === 'RESUBMIT', pls = apps.filter(function (a) { return a.status === 'PENDING' && a.kind === 'LEVEL'; }), ts = liveTrainings(), today = new Date().toISOString().slice(0, 10);
   var h = '<div class="a-page"><button class="a-back" data-go="pros">' + ic('arrow-left', 16) + ' All Pros</button>';
-  h += '<div class="a-prohead">' + avatar(p.name, p.status === 'APPROVED', 'lg') + '<div class="t"><h1>' + esc(p.name) + '</h1><div class="a-row" style="gap:8px">' + proStatusBadge(p) + levelBar(lv, LEVEL_INFO[lv].name) + '</div></div><div class="a-grid k a-prostats">' + stat('Completed jobs', st.completed) + stat('Active jobs', st.active) + stat('Rating', st.rating != null ? st.rating.toFixed(1) : '—', st.ratings ? st.ratings + ' rating' + (st.ratings > 1 ? 's' : '') : 'No ratings yet') + stat('Paid to Pro', P(st.paid)) + '</div></div>';
+  h += '<div class="a-prohead">' + avatar(p.name, p.status === 'APPROVED', 'lg') + '<div class="t"><h1>' + esc(p.name) + '</h1><div class="a-row" style="gap:8px">' + proStatusBadge(p) + roleBars(p) + '</div></div><div class="a-grid k a-prostats">' + stat('Completed jobs', st.completed) + stat('Active jobs', st.active) + stat('Rating', st.rating != null ? st.rating.toFixed(1) : '—', st.ratings ? st.ratings + ' rating' + (st.ratings > 1 ? 's' : '') : 'No ratings yet') + stat('Paid to Pro', P(st.paid)) + '</div></div>';
   if (p.status === 'INVITED') h += banner('bell', inviteOpen(p) ? 'Invitation sent ' + fdate(p.invite.sentAt, true) : 'Invitation expired', inviteOpen(p) ? 'Waiting for ' + esc(p.firstName || p.name) + ' to accept it and create a password. Expires ' + fdate(p.invite.expiresAt) + '.' : 'Send a new invitation so ' + esc(p.firstName || p.name) + ' can join.', '<button type="button" class="ld-btn ld-btn-primary ld-btn-sm" data-act="pro-resend" data-id="' + p.id + '">' + (inviteOpen(p) ? 'Resend invitation' : 'Send new invitation') + '</button><button type="button" class="ld-btn ld-btn-secondary ld-btn-sm" data-act="pro-uninvite" data-id="' + p.id + '">Cancel invitation</button>', inviteOpen(p) ? 'brand' : 'danger');
   if (p.status === 'PENDING') h += banner('verified-pro', 'New Pro application', 'Check their details and documents below, then approve, ask for changes or decline.', '<a class="ld-btn ld-btn-primary ld-btn-sm" href="#pd-apps">Review application</a>', 'warning');
-  if (pl) h += banner('training', 'Applied for Level ' + pl.to + ' · ' + LEVEL_INFO[pl.to].name, 'Sent ' + fdate(pl.createdAt, true) + '.', '<a class="ld-btn ld-btn-primary ld-btn-sm" href="#pd-apps">Review application</a>', 'warning');
-  var expd = (p.docs || []).filter(function (d) { return d.expires && d.expires < today; }); if (expd.length) h += banner('warning', 'Expired document: ' + expd.map(function (d) { return d.type; }).join(', '), 'The Pro can’t receive offers until it’s replaced.', '', 'danger');
+  pls.forEach(function (pl) { h += banner('training', 'Applied for ' + appTitle(pl), 'Sent ' + fdate(pl.createdAt, true) + '.', '<a class="ld-btn ld-btn-primary ld-btn-sm" href="#pd-apps">Review application</a>', 'warning'); });
+  var expd = (p.docs || []).filter(function (d) { return d.expires && d.expires < today; }); if (expd.length) h += banner('warning', 'Expired document: ' + expd.map(function (d) { return docLabel(d.type); }).join(', '), 'The Pro can’t receive offers until it’s replaced.', '', 'danger');
   h += '<div class="a-pdgrid">';
   /* personal details */
   h += '<section class="a-card" id="pd-personal"><h3>' + ic('user', 18) + ' Personal details</h3><dl class="a-kv"><dt>Full name</dt><dd>' + esc(p.name) + '</dd><dt>Email</dt><dd>' + esc(p.email || '—') + '</dd><dt>Phone</dt><dd>' + esc(p.phone || '—') + '</dd><dt>Home postcode</dt><dd>' + esc(p.home || '—') + '</dd><dt>Working as</dt><dd>' + (p.bizType === 'ltd' ? 'Limited company' : p.bizType ? 'Sole trader / individual' : '—') + (p.bizName ? ' · ' + esc(p.bizName) : '') + '</dd><dt>Joined</dt><dd>' + fdate(p.createdAt) + '</dd><dt>Application sent</dt><dd>' + fdate((p.onboarding || {}).submittedAt, true) + '</dd><dt>Payout account</dt><dd>' + (p.payout && p.payout.ready ? esc(p.payout.holder || '') + ' · ending ' + esc(p.payout.last4) + ' (test)' : 'Not set up') + '</dd></dl></section>';
   /* work */
   var av = p.availability || {};
-  h += '<section class="a-card" id="pd-work"><h3>' + ic('calendar', 18) + ' Work preferences</h3><dl class="a-kv"><dt>Services</dt><dd>' + ((p.skills || []).map(function (s) { return SKILLS[s].label; }).join(', ') || '—') + '</dd><dt>Areas covered</dt><dd>' + esc((p.coverage || []).join(', ') || '—') + '</dd><dt>Working days</dt><dd>' + ((av.days || []).map(function (d) { return DAYS[d]; }).join(', ') || '—') + '</dd><dt>Windows</dt><dd>' + ((av.slots || []).map(function (s) { return (WINDOWS[s] || [s])[0]; }).join(', ') || '—') + '</dd><dt>Can be offered</dt><dd>' + esc(LEVEL_INFO[lv].unlocks) + ((p.skills || []).indexOf('REPAIRS_DAMAGES') >= 0 ? ', plus Repairs & Damages' : '') + '</dd></dl></section>';
+  h += '<section class="a-card" id="pd-work"><h3>' + ic('calendar', 18) + ' Work preferences</h3><dl class="a-kv"><dt>Roles</dt><dd>' + (roles.map(function (r) { return ROLES[r].label; }).join(', ') || '—') + '</dd><dt>Services</dt><dd>' + ((p.skills || []).map(function (s) { return SKILLS[s].label; }).join(', ') || '—') + '</dd><dt>Areas covered</dt><dd>' + esc((p.coverage || []).join(', ') || '—') + '</dd><dt>Working days</dt><dd>' + ((av.days || []).map(function (d) { return DAYS[d]; }).join(', ') || '—') + '</dd><dt>Windows</dt><dd>' + ((av.slots || []).map(function (s) { return (WINDOWS[s] || [s])[0]; }).join(', ') || '—') + '</dd><dt>Can take</dt><dd>' + (roles.map(function (r) { return ROLES[r].unlocks[proLevel(p, r)]; }).join('; ') || '—') + '</dd></dl></section>';
   h += '</div>';
-  /* level */
-  var c = levelCheck(p, lv + 1), hist4 = (p.levelHistory || []).slice().reverse();
-  h += '<section class="a-card" id="pd-level"><h3>' + ic('star', 18) + ' Level & pay</h3><div class="a-pdlevel"><div>' + levelBar(lv, LEVEL_INFO[lv].name) + '<p style="margin-top:8px">' + esc(LEVEL_INFO[lv].unlocks) + '.</p><p class="a-fine">Hourly rate ' + P(proRate(lv)) + ' for workload-based fees.</p>' + (c ? '<h4>Requirements for Level ' + (lv + 1) + ' · ' + esc(LEVEL_INFO[lv + 1].name) + '</h4>' + reqList(c) : '<p class="a-fine">At the top level.</p>') + '</div>' +
-    '<form class="a-form a-subcard" data-form="set-level" data-id="' + p.id + '"><h4>Change level</h4>' + field('sl-' + p.id + '-' + lv, 'New level', sel('sl-' + p.id + '-' + lv, 'level', [1, 2, 3, 4, 5].map(function (n) { var g = trainingGate(p, n); return [n, 'Level ' + n + ' · ' + LEVEL_INFO[n].name + (g !== true ? ' (training not done)' : '')]; }), lv)) + field('slr-' + p.id, 'Reason', inp('slr-' + p.id, 'reason', '', 'required'), 'Recorded in the audit log. Levels 4 and 5 need the required trainings completed.') + '<div class="a-actions"><button class="ld-btn ld-btn-secondary ld-btn-sm" type="submit">Save level</button></div></form></div>' +
-    (hist4.length ? '<details><summary>Level history (' + hist4.length + ')</summary><ul class="a-fine">' + hist4.map(function (x) { return '<li>' + fdate(x.at, true) + ': Level ' + x.from + ' → ' + x.to + ' · ' + esc(x.reason) + '</li>'; }).join('') + '</ul></details>' : '') + '</section>';
+  /* roles and levels */
+  var hist4 = (p.levelHistory || []).slice().reverse();
+  h += '<section class="a-card" id="pd-level"><h3>' + ic('star', 18) + ' Roles, levels & pay</h3>' + (roles.length ? roles.map(function (r) { return roleLevelSection(p, r); }).join('') : '<p class="a-muted">No role yet. Roles follow the services the Pro delivers.</p>') +
+    (hist4.length ? '<details><summary>Level history (' + hist4.length + ')</summary><ul class="a-fine">' + hist4.map(function (x) { return '<li>' + fdate(x.at, true) + ': ' + (x.role ? ROLES[x.role].label + ' ' : '') + 'Level ' + x.from + ' → ' + x.to + ' · ' + esc(x.reason) + '</li>'; }).join('') + '</ul></details>' : '') + '</section>';
   /* applications */
-  var joinForm = join ? '<form class="a-form a-subcard" data-form="pro-review" data-id="' + p.id + '"><h4>Decide on this application</h4><div class="two">' + field('lv-' + p.id, 'Starting level', sel('lv-' + p.id, 'level', [1, 2, 3, 4, 5].map(function (n) { var g = trainingGate(p, n); return [n, 'Level ' + n + ' · ' + LEVEL_INFO[n].name + (g !== true ? ' (training not done)' : '')]; }), 1)) + field('rv-' + p.id, 'Reason / note <small>Required unless approving</small>', inp('rv-' + p.id, 'reason', '')) + '</div><div class="a-actions"><button class="ld-btn ld-btn-primary ld-btn-sm" name="d" value="APPROVED"' + (p.status === 'PENDING' ? '' : ' disabled title="Waiting for the Pro to resubmit"') + '>Approve</button><button class="ld-btn ld-btn-secondary ld-btn-sm" name="d" value="RESUBMIT">Request changes</button><button class="ld-btn ld-btn-danger ld-btn-sm" name="d" value="REJECTED">Decline</button></div></form>' : '';
+  var joinForm = join ? '<form class="a-form a-subcard" data-form="pro-review" data-id="' + p.id + '"><h4>Decide on this application</h4><div class="two">' + roles.map(function (r) { return field('lv-' + p.id + '-' + r, 'Starting level as ' + ROLES[r].label, sel('lv-' + p.id + '-' + r, 'level_' + r, [1, 2, 3].map(function (n) { var g = trainingGate(p, r, n); return [n, roleBadge(r, n) + (g !== true ? ' (training not done)' : '')]; }), 1)); }).join('') + field('rv-' + p.id, 'Reason / note <small>Required unless approving</small>', inp('rv-' + p.id, 'reason', '')) + '</div><p class="a-fine">The first ' + standardsJobs() + ' jobs in each role get a closer LISTD review.</p><div class="a-actions"><button class="ld-btn ld-btn-primary ld-btn-sm" name="d" value="APPROVED"' + (p.status === 'PENDING' ? '' : ' disabled title="Waiting for the Pro to resubmit"') + '>Approve</button><button class="ld-btn ld-btn-secondary ld-btn-sm" name="d" value="RESUBMIT">Request changes</button><button class="ld-btn ld-btn-danger ld-btn-sm" name="d" value="REJECTED">Decline</button></div></form>' : '';
   var shown = apps.slice(); if (p.status === 'PENDING' && !apps.some(function (a) { return a.kind === 'JOIN' && a.status === 'PENDING'; })) shown.unshift({ id: 'join-' + p.id, kind: 'JOIN', status: 'PENDING', createdAt: (p.onboarding || {}).submittedAt });
   h += '<section class="a-card" id="pd-apps"><h3>' + ic('verified-pro', 18) + ' Applications</h3>' + (shown.length ? shown.map(function (a) {
-    var body = '<div class="a-app"><div class="a-row sb"><div><b>' + esc(appTitle(a)) + '</b>' + (a.kind === 'LEVEL' ? ' <span class="a-fine">' + esc(LEVEL_INFO[a.to].name) + '</span>' : '') + '<div class="a-fine">Sent ' + fdate(a.createdAt, true) + (a.decision && a.decision.at ? ' · decided ' + fdate(a.decision.at, true) : '') + '</div></div>' + appBadge(a) + '</div>';
+    var body = '<div class="a-app"><div class="a-row sb"><div><b>' + esc(appTitle(a)) + '</b><div class="a-fine">Sent ' + fdate(a.createdAt, true) + (a.decision && a.decision.at ? ' · decided ' + fdate(a.decision.at, true) : '') + '</div></div>' + appBadge(a) + '</div>';
     if (a.note) body += '<p class="a-fine">Pro’s note: “' + esc(a.note) + '”</p>';
     if (a.decision && a.decision.reason) body += '<p class="a-fine">Decision: ' + esc(a.decision.reason) + '</p>';
-    if (a.status === 'PENDING' && a.kind === 'LEVEL') { var ck = levelCheck(p, a.to); body += reqList(ck) + '<form class="a-form" data-form="app-decide" data-id="' + a.id + '">' + field('ad-' + a.id, 'Reason / note <small>Required to decline</small>', inp('ad-' + a.id, 'reason', '')) + '<div class="a-actions"><button class="ld-btn ld-btn-primary ld-btn-sm" name="d" value="APPROVE"' + (trainingGate(p, a.to) === true ? '' : ' disabled title="Required trainings not completed"') + '>Approve Level ' + a.to + '</button><button class="ld-btn ld-btn-danger ld-btn-sm" name="d" value="REJECT">Decline</button></div></form>'; }
+    if (a.status === 'PENDING' && a.kind === 'LEVEL') { var ar = appRole(a), at = a.role ? a.to : legacyRoleLevel({ level: a.to }, ar), ck = levelCheck(p, ar, at); body += (ck ? reqList(ck) : '') + '<form class="a-form" data-form="app-decide" data-id="' + a.id + '">' + field('ad-' + a.id, 'Reason / note <small>Required to decline</small>', inp('ad-' + a.id, 'reason', '')) + '<div class="a-actions"><button class="ld-btn ld-btn-primary ld-btn-sm" name="d" value="APPROVE"' + (trainingGate(p, ar, at) === true ? '' : ' disabled title="Required trainings not completed"') + '>Approve ' + esc(roleBadge(ar, at)) + '</button><button class="ld-btn ld-btn-danger ld-btn-sm" name="d" value="REJECT">Decline</button></div></form>'; }
     if (a.status === 'PENDING' && a.kind === 'JOIN') body += joinForm;
     return body + '</div>';
   }).join('') : '<p class="a-muted">No applications yet.</p>') + (join && !shown.some(function (a) { return a.kind === 'JOIN' && a.status === 'PENDING'; }) ? joinForm : '') + '</section>';
@@ -3794,10 +3885,10 @@ function vAdminPro() {
   var tdn = ts.filter(function (t) { return doneAt(p, t.id); }).length;
   h += '<section class="a-card" id="pd-training"><h3>' + ic('training', 18) + ' Trainings <span class="a-fine">' + tdn + ' of ' + ts.length + ' completed</span></h3>' + (ts.length ? '<div class="a-tw"><table><thead><tr><th>Training</th><th>Needed for</th><th>Type</th><th>Status</th></tr></thead><tbody>' + ts.map(function (t) { var d = doneAt(p, t.id); return '<tr class="click" data-go="training" data-id="' + t.id + '"><td><b>' + esc(t.title) + '</b></td><td>' + forLevel(t) + '</td><td>' + trainKind(t)[1] + '</td><td>' + (d ? badge('Completed ' + fdate(d), 'success', 'check') : badge('Not completed', '')) + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<p class="a-muted">No trainings published yet. Add them under Training.</p>') + '</section>';
   /* documents */
-  h += '<section class="a-card" id="pd-docs"><h3>' + ic('file', 18) + ' Documents <span class="a-fine">Admins only. Never shown in reports.</span></h3><div class="a-tw"><table><thead><tr><th>Document</th><th>File</th><th>Uploaded</th><th>Expires</th><th>Status</th></tr></thead><tbody>' + DOCS.map(function (dd) {
-    var d = (p.docs || []).filter(function (x) { return x.type === dd[0]; })[0], e = d && D.evidence[d.fileId], need = dd[2] || (dd[0] === 'INSURANCE' && (p.skills || []).indexOf('REPAIRS_DAMAGES') >= 0);
+  h += '<section class="a-card" id="pd-docs"><h3>' + ic('file', 18) + ' Documents <span class="a-fine">Admins only. Never shown in reports.</span></h3><div class="a-tw"><table><thead><tr><th>Document</th><th>Needed for</th><th>File</th><th>Uploaded</th><th>Expires</th><th>Status</th></tr></thead><tbody>' + DOCS.map(function (dd) {
+    var d = (p.docs || []).filter(function (x) { return x.type === dd[0]; })[0], e = d && D.evidence[d.fileId], need = docNeeded(p, dd);
     var stt = !d ? (need ? badge('Missing', 'danger') : badge('Not needed', '')) : d.expires && d.expires < today ? badge('Expired', 'danger') : badge('Uploaded', 'success');
-    return '<tr><td>' + esc(dd[1]) + '</td><td>' + (d ? (e ? '<a href="' + esc(fileSrc(e)) + '" target="_blank" rel="noopener">' + esc(d.name) + '</a>' : esc(d.name)) : '—') + '</td><td>' + (d ? fdate(d.at) : '—') + '</td><td>' + (d && d.expires ? fdate(d.expires) : '—') + '</td><td>' + stt + '</td></tr>';
+    return '<tr><td>' + esc(dd[1]) + '</td><td class="a-fine">' + esc(docFor(dd)) + '</td><td>' + (d ? (e ? '<a href="' + esc(fileSrc(e)) + '" target="_blank" rel="noopener">' + esc(d.name) + '</a>' : esc(d.name)) : '—') + '</td><td>' + (d ? fdate(d.at) : '—') + '</td><td>' + (d && d.expires ? fdate(d.expires) : '—') + '</td><td>' + stt + '</td></tr>';
   }).join('') + '</tbody></table></div></section>';
   /* jobs */
   var js = list('jobs').filter(function (j) { return j.proId === p.id; }).sort(byNew);
@@ -3809,17 +3900,17 @@ function vAdminPro() {
 
 /* ---------- Admin: Training library ---------- */
 function vAdminTraining() {
-  var all = list('trainings').filter(function (t) { return S.tshow === 'archived' ? t.status === 'ARCHIVED' : t.status !== 'ARCHIVED'; }).sort(function (a, b) { return ((+a.level || 9) - (+b.level || 9)) || byNew(a, b); }), approved = list('pros').filter(function (p) { return p.status === 'APPROVED'; }), up = S.tUp;
-  var h = '<div class="a-page"><div class="a-head"><div><h1>Training</h1><p>Videos and PDFs for Pros. A training marked for Level 4 or 5 must be completed before a Pro can move up to that level.</p></div><button type="button" class="ld-btn ld-btn-primary" data-act="t-new">' + ic('plus', 18) + ' Add training materials</button></div>';
+  var all = list('trainings').filter(function (t) { return S.tshow === 'archived' ? t.status === 'ARCHIVED' : t.status !== 'ARCHIVED'; }).sort(function (a, b) { return String(tRole(a)).localeCompare(String(tRole(b))) || ((tLevel(a) || 9) - (tLevel(b) || 9)) || byNew(a, b); }), approved = list('pros').filter(function (p) { return p.status === 'APPROVED'; });
+  var h = '<div class="a-page"><div class="a-head"><div><h1>Training</h1><p>Videos and PDFs for Pros. A training required for a role and level must be completed before a Pro can hold that level.</p></div><button type="button" class="ld-btn ld-btn-primary" data-act="t-new">' + ic('plus', 18) + ' Add training materials</button></div>';
   var tab = S.trTab === 'levels' ? 'levels' : 'library';
-  h += '<div class="a-segtabs" role="tablist" aria-label="Training views"><button type="button" role="tab" data-act="tr-tab" data-t="library" aria-selected="' + (tab === 'library') + '">' + ic('training', 16) + 'Library <span class="a-fine">' + list('trainings').filter(function (t) { return t.status !== 'ARCHIVED'; }).length + '</span></button><button type="button" role="tab" data-act="tr-tab" data-t="levels" aria-selected="' + (tab === 'levels') + '">' + ic('star', 16) + 'Levels</button></div>';
+  h += '<div class="a-segtabs" role="tablist" aria-label="Training views"><button type="button" role="tab" data-act="tr-tab" data-t="library" aria-selected="' + (tab === 'library') + '">' + ic('training', 16) + 'Library <span class="a-fine">' + list('trainings').filter(function (t) { return t.status !== 'ARCHIVED'; }).length + '</span></button><button type="button" role="tab" data-act="tr-tab" data-t="levels" aria-selected="' + (tab === 'levels') + '">' + ic('star', 16) + 'Roles & levels</button></div>';
   if (tab === 'library') h += '<section class="a-sec"><h2>Library <span class="a-row" style="gap:6px"><button type="button" class="ld-btn ld-btn-sm ' + (S.tshow === 'archived' ? 'ld-btn-ghost' : 'ld-btn-secondary') + '" data-act="tshow" data-t="">Current</button><button type="button" class="ld-btn ld-btn-sm ' + (S.tshow === 'archived' ? 'ld-btn-secondary' : 'ld-btn-ghost') + '" data-act="tshow" data-t="archived">Archived</button></span></h2>' + (all.length ? '<div class="a-tw"><table><thead><tr><th>Training</th><th>Type</th><th>Needed for</th><th class="r">Length</th><th class="r">Completed by</th><th>Status</th><th></th></tr></thead><tbody>' + all.map(function (t) {
     var n = approved.filter(function (p) { return doneAt(p, t.id); }).length, k = trainKind(t);
     var acts = t.status === 'PUBLISHED' ? '<button type="button" class="ld-btn ld-btn-ghost ld-btn-sm" data-act="t-status" data-id="' + t.id + '" data-s="DRAFT">Unpublish</button>' : t.status === 'DRAFT' ? '<button type="button" class="ld-btn ld-btn-secondary ld-btn-sm" data-act="t-status" data-id="' + t.id + '" data-s="PUBLISHED">Publish</button>' : '<button type="button" class="ld-btn ld-btn-secondary ld-btn-sm" data-act="t-status" data-id="' + t.id + '" data-s="DRAFT">Restore</button>';
     if (t.status !== 'ARCHIVED') acts += '<button type="button" class="ld-btn ld-btn-ghost ld-btn-sm" data-act="t-status" data-id="' + t.id + '" data-s="ARCHIVED">Archive</button>';
     return '<tr><td><a href="#" class="a-tlink" data-go="training" data-id="' + t.id + '"><b>' + esc(t.title) + '</b></a>' + (t.desc ? '<div class="a-fine">' + esc(t.desc.length > 90 ? t.desc.slice(0, 90) + '…' : t.desc) + '</div>' : '') + '</td><td class="nw">' + ic(k[0], 16) + ' ' + k[1] + '</td><td>' + forLevel(t) + '</td><td class="r num">' + (t.minutes ? t.minutes + ' min' : '—') + '</td><td class="r num">' + n + ' of ' + approved.length + '</td><td>' + badge({ PUBLISHED: 'Published', DRAFT: 'Draft', ARCHIVED: 'Archived' }[t.status], t.status === 'PUBLISHED' ? 'success' : '') + '</td><td class="r"><span class="a-row" style="gap:4px;justify-content:flex-end;flex-wrap:nowrap">' + acts + '</span></td></tr>';
   }).join('') + '</tbody></table></div>' : empty('training', S.tshow === 'archived' ? 'Nothing archived' : 'No trainings yet', S.tshow === 'archived' ? 'Archived trainings appear here.' : 'Use Add training materials to upload a video or PDF. Pros see published trainings under Training & level.', '')) + '</section>';
-  if (tab === 'levels') h += '<section class="a-sec"><h2>Levels</h2>' + '<div class="a-tw"><table><thead><tr><th>Level</th><th>Can take</th><th class="r">Min. jobs</th><th class="r">Min. rating</th><th class="r">Hourly rate</th><th class="r">Required trainings</th><th class="r">Pros</th></tr></thead><tbody>' + [1, 2, 3, 4, 5].map(function (n) { var r = lvRule(n), req = liveTrainings().filter(function (t) { return +t.level === n; }).length; return '<tr><td class="nw"><span class="a-lvchip">L' + n + '</span> <b>' + esc(LEVEL_INFO[n].name) + '</b></td><td>' + esc(LEVEL_INFO[n].unlocks) + '</td><td class="r num">' + r.minJobs + '</td><td class="r num">' + (r.minRating ? (+r.minRating).toFixed(1) : '—') + '</td><td class="r num">' + P(proRate(n)) + '</td><td class="r num">' + (n >= 2 ? req : '—') + '</td><td class="r num">' + approved.filter(function (p) { return proLevel(p) === n; }).length + '</td></tr>'; }).join('') + '</tbody></table></div><p class="a-fine">Hourly rates are set under Pricing. Job and rating rules can be changed in Catalogue & policies.</p></section>';
+  if (tab === 'levels') h += '<section class="a-sec"><h2>Roles & levels</h2><div class="a-tw"><table><thead><tr><th>Role & level</th><th>Can take</th><th class="r">Min. jobs in role</th><th class="r">Min. rating</th><th class="r">Hourly rate</th><th class="r">Required trainings</th><th class="r">Pros</th></tr></thead><tbody>' + ROLE_KEYS.map(function (role) { return [1, 2, 3].map(function (n) { var r = lvRule(n), req = liveTrainings().filter(function (t) { return tRole(t) === role && tLevel(t) === n; }).length; return '<tr><td class="nw"><span class="a-lvchip">' + ROLES[role].short + ' L' + n + '</span> <b>' + esc(roleBadge(role, n)) + '</b></td><td>' + esc(ROLES[role].unlocks[n]) + '</td><td class="r num">' + r.minJobs + '</td><td class="r num">' + (r.minRating ? (+r.minRating).toFixed(1) : '—') + '</td><td class="r num">' + P(proRate(role, n)) + '</td><td class="r num">' + req + '</td><td class="r num">' + approved.filter(function (p) { return proRoles(p).indexOf(role) >= 0 && proLevel(p, role) === n; }).length + '</td></tr>'; }).join(''); }).join('') + '</tbody></table></div><p class="a-fine">Hourly rates are set under Pricing. Job and rating rules, and the number of standards-check jobs (' + standardsJobs() + '), are set in Catalogue & policies.</p></section>';
   return h + '</div>';
 }
 function trainingModal() {
@@ -3827,7 +3918,7 @@ function trainingModal() {
   var body = field('tr-title', 'Title', inp('tr-title', 'title', '', 'required maxlength="120" placeholder="e.g. Writing a check-in inventory"')) + field('tr-desc', 'What it covers <small>Optional</small>', area('tr-desc', 'desc', '', 'maxlength="600"')) +
     '<div class="ld-field"><span class="ld-label">Video or PDF</span>' + (up ? '<div class="a-upfile">' + ic(up.kind === 'video' ? 'play' : 'file', 20) + '<span><b>' + esc(up.name) + '</b><span class="a-fine">' + (up.kind === 'video' ? 'Video' : 'PDF') + ' · ' + (up.size < 1048576 ? Math.max(1, Math.round(up.size / 1024)) + ' KB' : (Math.round(up.size / 104857.6) / 10) + ' MB') + '</span></span><button type="button" class="ld-btn ld-btn-ghost ld-btn-sm" data-act="t-unup">Remove</button></div>' : '<label class="a-up">' + ic('upload', 18) + 'Upload a video or PDF<input type="file" accept="video/mp4,video/webm,video/quicktime,application/pdf" data-up=\'{"training":1}\'></label><span class="ld-hint">MP4, WebM or MOV video, or PDF, up to ' + (ENV.assets ? '20' : '2.5') + ' MB.' + (ENV.assets ? '' : ' Local demo mode: larger files need the published app.') + '</span>') + '</div>' +
     (up ? '' : field('tr-link', 'Or link to a video <small>Optional, https only</small>', inp('tr-link', 'link', '', 'type="url" placeholder="https://"'), 'Use a link for long videos hosted on YouTube, Vimeo or similar.')) +
-    '<div class="two">' + field('tr-level', 'Required for', sel('tr-level', 'level', [[4, 'Level 4 · Inspector'], [5, 'Level 5 · Senior inspector'], [2, 'Level 2 · Experienced cleaner'], [3, 'Level 3 · Senior cleaner'], [0, 'Optional, not required']], 4)) + field('tr-min', 'Length (minutes)', inp('tr-min', 'minutes', '', 'type="number" min="0" step="1"')) + '</div><label class="ld-check"><input type="checkbox" name="publish" id="tr-pub" checked><span>Publish now<small>Approved Pros get a notification. Untick to save as a draft.</small></span></label>';
+    '<div class="two">' + field('tr-level', 'Required for', sel('tr-level', 'level', roleOptions(), 'CLERK:1')) + field('tr-min', 'Length (minutes)', inp('tr-min', 'minutes', '', 'type="number" min="0" step="1"')) + '</div><label class="ld-check"><input type="checkbox" name="publish" id="tr-pub" checked><span>Publish now<small>Approved Pros in that role get a notification. Untick to save as a draft.</small></span></label>';
   return mShell('training-add', 'Add training materials', body, 'Add training');
 }
 
@@ -4027,7 +4118,7 @@ function badgeFor(v) {
 }
 function whoBlock() {
   if (S.role === 'client') { var c = me(); return '<div class="who"><b>' + esc(c.orgName || c.name) + '</b><span>' + esc(SEGMENTS[c.segment].label) + '</span></div>'; }
-  if (S.role === 'pro') { var p = meP(), st = proStats(p.id); return '<div class="who"><b>' + esc(p.name) + '</b><span>Level ' + st.level + ' · ' + esc(st.levelName) + '</span></div>'; }
+  if (S.role === 'pro') { var p = meP(), st = proStats(p.id); return '<div class="who"><b>' + esc(p.name) + '</b><span>' + esc(st.levelName) + '</span></div>'; }
   return '<div class="who"><b>LISTD operations</b><span>' + esc((STAFF_ROLES[staffRole()] || { label: 'Admin' }).label) + '</span></div>';
 }
 /* notifications slide-in panel (opened from the bell, top right) */
@@ -4193,7 +4284,7 @@ document.addEventListener('click', function (e) {
     case 'ob-back': patchDoc('clients', S.clientId, { onboarding: { status: 'IN_PROGRESS', step: Math.max(1, me().onboarding.step - 1) } }); break;
     case 'cl-ob-finish': patchDoc('clients', S.clientId, { onboarding: { status: 'DONE', step: 5, doneAt: now() } }); S.view = 'home'; toast('You’re all set'); break;
     case 'pob-back': patchDoc('pros', S.proId, { onboarding: { status: 'IN_PROGRESS', step: Math.max(2, meP().onboarding.step - 1) } }); break;
-    case 'pob-docs': var p = meP(), req = DOCS.filter(function (d) { return d[2] || (d[0] === 'INSURANCE' && (p.skills || []).indexOf('REPAIRS_DAMAGES') >= 0); }), missing = req.filter(function (d) { return !(p.docs || []).some(function (x) { return x.type === d[0]; }); }); if (missing.length) { toast('Upload: ' + missing.map(function (d) { return d[1]; }).join(', ')); return; } patchDoc('pros', S.proId, { onboarding: { status: 'IN_PROGRESS', step: 6 } }); break;
+    case 'pob-docs': var p = meP(), missing = docsMissing(p); if (missing.length) { toast('Upload: ' + missing.map(function (d) { return d[1]; }).join(', ')); return; } patchDoc('pros', S.proId, { onboarding: { status: 'IN_PROGRESS', step: 6 } }); break;
     case 'pob-submit': var tc = document.getElementById('pob-terms'); if (!tc || !tc.checked) { toast('Agree to the Pro terms to submit.'); if (tc) tc.focus(); return; } patchDoc('pros', S.proId, { consent: Object.assign({}, meP().consent, { terms: now() }), onboarding: { status: 'SUBMITTED', step: 7, submittedAt: now() }, status: 'PENDING' }); if (!pendingApp(S.proId, 'JOIN')) setDoc('applications', uid(), { proId: S.proId, kind: 'JOIN', from: 0, to: 1, status: 'PENDING', createdAt: now() }); notify('admin', 'Pro application from ' + meP().name + ' to review'); S.view = 'home'; toast('Application submitted'); break;
     case 'pob-edit': patchDoc('pros', S.proId, { onboarding: { status: 'IN_PROGRESS', step: 2 } }); break;
     /* properties & wizard */
@@ -4230,6 +4321,7 @@ document.addEventListener('click', function (e) {
     case 'rv': S.params = Object.assign({}, S.params, { rv: +a.dataset.v }); render(); break;
     /* pro */
     case 'offer-yes': if (cmdOfferReply(j, true)) toast('Job accepted and scheduled'); break;
+    case 'take-open': if (cmdTakeOpenJob(j)) toast('Job accepted and scheduled'); break;
     case 'offer-no': M('offer-no'); break;
     case 'clock-in': if (cmdClockIn(j, (S.clockPhoto || {})[id])) { delete S.clockPhoto[id]; toast('Clocked in'); } break;
     case 'cond': var d = draftOf(j), it = d.rooms[+a.dataset.r].items[+a.dataset.i]; it.cond = it.cond === a.dataset.c ? '' : a.dataset.c; saveDraft(id); render(); break;
@@ -4279,7 +4371,7 @@ document.addEventListener('change', async function (e) {
   if (el.dataset.staffrole) { if (el.value) { var sid = el.dataset.staffrole, srole = el.value; el.value = (D.staff[sid] || {}).role || ''; keyDecision('staff-role', { id: sid, role: srole }); } return; }
   if (el.id === 'inv-c') { S.modal.cid = el.value; S.modal.jid = ''; S.modal.pid = ''; render(); return; }
   if (el.id === 'inv-j') { S.modal.jid = el.value; render(); invCalc(document.querySelector('form[data-form=inv-create]')); return; }
-  if (el.id === 'of-pro') { var fe = document.getElementById('of-fee'), pr0 = D.pros[el.value], jq = fe && D.jobs[fe.dataset.job], aq0 = jq && acceptedQuote(jq); if (fe && pr0 && aq0 && aq0.proBase) fe.value = (feeFromBase(aq0.proBase, proLevel(pr0)) / 100).toFixed(2); return; }
+  if (el.id === 'of-pro') { var fe = document.getElementById('of-fee'), pr0 = D.pros[el.value], jq = fe && D.jobs[fe.dataset.job], aq0 = jq && acceptedQuote(jq); if (fe && pr0 && aq0 && aq0.proBase) fe.value = (feeFromBase(aq0.proBase, proLevel(pr0, baseRole(aq0.proBase))) / 100).toFixed(2); return; }
   if (el.dataset.wizclean && S.wiz) { S.wiz.scope.clean = el.value; S.wiz.scope.addons = (S.wiz.scope.addons || []).filter(function (a) { return cleanIncl(el.value).indexOf(a) < 0; }); render(); return; }
   if (S.wiz && ['w-bed', 'w-rec', 'w-frn', 'w-unf'].indexOf(el.id) >= 0) { var g = function (id) { var e = document.getElementById(id); return e ? Math.max(0, +e.value || 0) : 0; }, tot = g('w-bed') + 1 + g('w-rec'), fe = document.getElementById('w-frn'), ue = document.getElementById('w-unf'); if (fe && ue) { if (el.id === 'w-unf') fe.value = Math.max(0, tot - g('w-unf')); else ue.value = Math.max(0, tot - Math.min(tot, g('w-frn'))); if (el.id !== 'w-unf' && g('w-frn') > tot) fe.value = tot; var nt = document.getElementById('w-furn-note'); if (nt) nt.textContent = 'Count the bedrooms, living room and reception rooms: ' + tot + ' in total. ' + FURNISH[furnLevel(g('w-frn'), tot)] + '.'; } return; }
   if (el.dataset.wizprop && S.wiz) { S.wiz.propertyId = el.value; S.wiz.rooms = null; render(); return; }
@@ -4390,16 +4482,18 @@ document.addEventListener('submit', function (e) {
     case 'resolve': if (!staffGuard('disputes', 'resolve disputes')) return; cmdResolveDispute(j, v('outcome'), v('reason'), toP(v('refund')), toP(v('feeAdj'))) && toast('Dispute resolved'); break;
     case 'co-issue': cmdIssueCO(j, f.dataset.co, toP(v('total')), toP(v('fee'))) && toast('Sent to client'); break;
     case 'pro-review': if (!staffGuard('pros', 'review Pros')) return;
-      var dec = e.submitter ? e.submitter.value : '', r = v('reason'), pr = D.pros[id], lv = Math.min(5, Math.max(1, +v('level') || proLevel(pr)));
+      var dec = e.submitter ? e.submitter.value : '', r = v('reason'), pr = D.pros[id], lvs = {}; proRoles(pr).forEach(function (ro) { lvs[ro] = Math.min(3, Math.max(1, +v('level_' + ro) || proLevel(pr, ro))); });
       if (dec !== 'APPROVED' && !r) { toast('Give a reason so the Pro knows what to do.'); return; }
-      if (dec === 'APPROVED' && pr.status === 'PENDING') { var gt = trainingGate(pr, lv); if (gt !== true) { toast(gt); return; } }
+      if (dec === 'APPROVED' && pr.status === 'PENDING') { var gt = true; Object.keys(lvs).forEach(function (ro) { var g1 = trainingGate(pr, ro, lvs[ro]); if (gt === true && g1 !== true) gt = g1; }); if (gt !== true) { toast(gt); return; } }
       var part = { status: dec, review: { decision: dec, reason: r, at: now() } }; if (dec === 'RESUBMIT' || dec === 'REJECTED') part.onboarding = Object.assign({}, pr.onboarding, { status: 'SUBMITTED' });
-      if (dec === 'APPROVED' && pr.status === 'PENDING') { part.level = lv; part.levelOverride = null; part.levelHistory = (pr.levelHistory || []).concat([{ from: 0, to: lv, reason: 'Starting level on approval' + (r ? ': ' + r : ''), at: now() }]); }
-      var ja = pendingApp(id, 'JOIN'); if (ja && pr.status === 'PENDING' && dec !== 'SUSPENDED') patchDoc('applications', ja.id, { status: dec === 'APPROVED' ? 'APPROVED' : dec === 'RESUBMIT' ? 'CHANGES' : 'REJECTED', decision: { by: ENV.uid || 'admin', reason: r || (dec === 'APPROVED' ? 'Approved at Level ' + lv : ''), at: now() } });
-      patchDoc('pros', id, part); audit('pro.review', 'pro', id, r || 'Approved', { decision: dec, level: part.level }); notify('p:' + id, dec === 'APPROVED' ? (pr.status === 'SUSPENDED' ? 'Your account has been reinstated.' : 'You’re approved at Level ' + lv + ' (' + LEVEL_INFO[lv].name + '). Offers will appear on your dashboard.') : dec === 'SUSPENDED' ? 'Your account has been suspended.' : 'Your application needs attention: ' + r); toast('Saved'); break;
-    case 'set-level': cmdSetLevel(id, +v('level'), v('reason')) && (toast('Level updated'), f.reset()); break;
+      var lvText = Object.keys(lvs).map(function (ro) { return roleBadge(ro, lvs[ro]); }).join(', ');
+      if (dec === 'APPROVED' && pr.status === 'PENDING') { part.levels = lvs; part.levelHistory = (pr.levelHistory || []).concat(Object.keys(lvs).map(function (ro) { return { role: ro, from: 0, to: lvs[ro], reason: 'Starting level on approval' + (r ? ': ' + r : ''), at: now() }; })); }
+      var ja = pendingApp(id, 'JOIN'); if (ja && pr.status === 'PENDING' && dec !== 'SUSPENDED') patchDoc('applications', ja.id, { status: dec === 'APPROVED' ? 'APPROVED' : dec === 'RESUBMIT' ? 'CHANGES' : 'REJECTED', decision: { by: ENV.uid || 'admin', reason: r || (dec === 'APPROVED' ? 'Approved as ' + lvText : ''), at: now() } });
+      patchDoc('pros', id, part); audit('pro.review', 'pro', id, r || 'Approved', { decision: dec, levels: part.levels }); notify('p:' + id, dec === 'APPROVED' ? (pr.status === 'SUSPENDED' ? 'Your account has been reinstated.' : 'You’re approved as ' + lvText + '. Open jobs near you and offers from LISTD will appear on your dashboard.') : dec === 'SUSPENDED' ? 'Your account has been suspended.' : 'Your application needs attention: ' + r); toast('Saved'); break;
+    case 'set-level': cmdSetLevel(id, v('role'), +v('level'), v('reason')) && (toast('Level updated'), f.reset()); break;
+    case 'std-pass': cmdPassStandards(id, v('role'), v('reason')) && (toast('Standards check marked as passed'), f.reset()); break;
     case 'app-decide': cmdDecideApp(id, (e.submitter && e.submitter.value) === 'APPROVE', v('reason')) && toast('Decision saved'); break;
-    case 'apply-level': cmdApplyLevel(v('note')) && toast('Application sent to LISTD'); break;
+    case 'apply-level': cmdApplyLevel(v('role'), v('note')) && toast('Application sent to LISTD'); break;
     case 'training-done': if (!fd.get('confirm')) { toast('Confirm you’ve finished the training.'); return; } cmdCompleteTraining(id) && toast('Training completed'); break;
     case 'staff-invite': if (!v('name') || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v('email'))) { toast('Enter their name and a valid work email.'); return; } keyDecision('staff-invite', { name: v('name'), email: v('email'), role: v('role') }); break;
     case 'staff-transfer': if (!fd.get('confirm')) { toast('Tick the box to confirm.'); return; } keyDecision('staff-transfer', { id: S.modal.id }); break;
@@ -4411,7 +4505,7 @@ document.addEventListener('submit', function (e) {
     case 'price-phone': var np = normPhone(v('phone')); if (!np) { toast('Enter a UK mobile number, or an international number starting with +.'); return; } if (pricePhone() && np === pricePhone()) { toast('That’s already the phone for price changes.'); return; } sendPriceCode(pricePhone() ? 'phone-old' : 'phone', pricePhone() || np, { newPhone: np }); break;
     case 'price-code': verifyPriceCode(v('code')).then(function (x) { if (x) priceCodeDone(x); else render(); }); break;
     case 'policies': if (!staffGuard('policies', 'change policies')) return; if (!isMainAdmin()) { toast('Only the Main admin can change catalogue & policies.'); return; }
-      var ns = { company: { name: v('coName') || 'LISTD Inventory', address: v('coAddr'), phone: v('coPhone'), email: v('coEmail') }, quoteValidityDays: Math.max(1, +v('quoteValidityDays') || 7), offerValidityHours: Math.max(1, +v('offerValidityHours') || 12), reviewHours: Math.max(1, +v('reviewHours') || 48), rescheduleHours: Math.max(0, +v('rescheduleHours') || 24), repairCategories: v('repairCategories').split(',').map(function (x) { return x.trim(); }).filter(Boolean), levels: [1, 2, 3, 4, 5].map(function (k) { var r = lvRule(k); return { minJobs: fd.has('lv_' + k + '_jobs') ? Math.max(0, Math.round(+v('lv_' + k + '_jobs') || 0)) : r.minJobs, minRating: fd.has('lv_' + k + '_rating') ? Math.min(5, Math.max(0, +v('lv_' + k + '_rating') || 0)) : r.minRating }; }) };
+      var ns = { company: { name: v('coName') || 'LISTD Inventory', address: v('coAddr'), phone: v('coPhone'), email: v('coEmail') }, quoteValidityDays: Math.max(1, +v('quoteValidityDays') || 7), offerValidityHours: Math.max(1, +v('offerValidityHours') || 12), reviewHours: Math.max(1, +v('reviewHours') || 48), rescheduleHours: Math.max(0, +v('rescheduleHours') || 24), repairCategories: v('repairCategories').split(',').map(function (x) { return x.trim(); }).filter(Boolean), roleLevels: [1, 2, 3].map(function (k) { var r = lvRule(k); return { minJobs: fd.has('lv_' + k + '_jobs') ? Math.max(0, Math.round(+v('lv_' + k + '_jobs') || 0)) : r.minJobs, minRating: fd.has('lv_' + k + '_rating') ? Math.min(5, Math.max(0, +v('lv_' + k + '_rating') || 0)) : r.minRating }; }), standardsJobs: fd.has('standardsJobs') ? Math.max(0, Math.round(+v('standardsJobs') || 0)) : standardsJobs() };
       keyDecision('policies', { ns: ns, reason: v('reason') }); break;
   }
 });

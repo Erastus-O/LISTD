@@ -46,7 +46,7 @@ with sync_playwright() as pw:
     signout(); p.click('[data-act=auth-mode][data-m=admin-setup]'); W(); setup('Ola Ops', 'ops@listd.test')
     check(p.evaluate('staffRole()') == 'OPS', 'invited staff gets their role on sign-in setup')
     n = nav(); p.screenshot(path=OUT + 'r3-ops.png')
-    check(all(x in n for x in ['Overview', 'Requests', 'Assignments', 'Report reviews', 'Invoicing', 'Clients']) and not any(x in n for x in ['Finance', 'Pros', 'Training', 'Catalogue & policies', 'Audit log', 'Disputes']), 'Operations nav: ' + ', '.join(n))
+    check(all(x in n for x in ['Overview', 'Bookings', 'Assignments', 'Report reviews', 'Invoicing', 'Clients']) and not any(x in n for x in ['Finance', 'Pros', 'Training', 'Catalogue & policies', 'Audit log', 'Disputes']), 'Operations nav: ' + ', '.join(n))
     p.evaluate("go('finance')"); W(); check('don’t have access' in p.locator('.a-main').inner_text(), 'Operations blocked from Finance')
     team(); check(p.locator('[data-act=staff-add]').count() == 0 and p.locator('[data-staffrole]').count() == 0, 'Operations can view the team but not change it')
     # someone not invited waits for a role

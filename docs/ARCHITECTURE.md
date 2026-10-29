@@ -148,19 +148,23 @@ Payment, dispute and settlement are tracked separately from the job status. Thes
 - **Payout** is eligible only when the job is completed, there is no open dispute, and the Pro has a payout account. The amount is the fee on the accepted offer. Payouts are idempotent per job.
 - **Repairs** are invoiced, and **cleaning and inspections** are quoted. Both use the same quote record: the client pays a repairs invoice in one step ("Pay invoice"), while a quote is accepted and then paid.
 
-## 5. Pro levels and training
+## 5. Pro roles, levels and training
 
-| Level | Can take | Default rule to apply | Pay share |
-|---|---|---|---|
-| 1 | Light cleans | Approved | 60% |
-| 2 | Light and General cleans | 5 jobs, 4.0 rating | 65% |
-| 3 | All cleans | 15 jobs, 4.3 rating | 70% |
-| 4 | Inspections up to 3 bedrooms, plus all cleans | 25 jobs, 4.5 rating, all Level 4 trainings | 75% |
-| 5 | Inspections of any size, plus all cleans | 40 jobs, 4.7 rating, all Level 4–5 trainings | 80% |
+A Pro holds one or more roles, decided by the services they deliver. Each role has three levels, unlocked by completed jobs and ratings in that role. Badges read “Pro Clerk · Level 3”.
 
-- **What controls the levels:** `requiredLevel(job)` decides the level a job needs, and `trainingGate(pro, level)` blocks Level 4 and 5 without the required trainings. There is no override.
-- **Editable rules:** job counts, ratings and pay shares can be changed in Catalogue & policies.
-- **Repairs:** a separately approved trade skill, not part of the levels.
+| Role | Services | Level 1 | Level 2 | Level 3 | Extra documents |
+|---|---|---|---|---|---|
+| Pro Clerk | Inventory, Check-In, Mid-Term, Check-Out | Up to 2 bedrooms | Up to 4 bedrooms | Any size | Professional indemnity insurance |
+| Pro Cleaner | Cleaning | Standard cleans | + End of Tenancy and Office | All cleans, incl. Deep | — |
+| Pro Trades | Repairs & Maintenance | Repairs (rate only) | Higher rate | Top rate | Legally required trade certificates |
+
+- **Every Pro:** photo ID, right to work, basic DBS and public liability insurance (`DOCS` in `pro.js`, `docNeeded(pro, doc)`).
+- **What controls the levels:** `requiredLevel(job)` gives the level a job needs in its role (`jobRole(job)`); `eligible()` checks `proLevel(pro, role)`. `trainingGate(pro, role, level)` blocks a level until its required trainings are done. There is no override.
+- **Rules to apply** (`settings().roleLevels`, Catalogue & policies): Level 2 at 10 jobs and 4.5 rating, Level 3 at 30 jobs and 4.7, counted within the role. Placeholders to confirm.
+- **Standards check:** the first `standardsJobs` (default 5) completed jobs in each role get a closer LISTD review and a “New to LISTD” badge (`standardsCheck(pro, role)`). An Admin can pass it early for experienced Pros. Passing it is required before applying for Level 2.
+- **Pay:** an hourly rate per role and level (`pricing().pro.rates`, set under Pricing). The Pro fee is the workload (`proBase`, which records the role and level it was priced at) × the Pro’s rate in that role.
+- **How jobs reach Pros:** paid jobs are open to every eligible Pro in the area (`openJobsFor`, `cmdTakeOpenJob`), and LISTD can also send a job straight to a chosen Pro (`cmdOffer`).
+- **Older data:** Pros and trainings saved with the old single Level 1–5 are read through `legacyRoleLevel()`, `tRole()` and `tLevel()` without migration.
 
 ## 6. Roles and permissions
 

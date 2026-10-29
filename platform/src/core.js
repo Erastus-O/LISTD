@@ -77,20 +77,42 @@ var STATUS = {
 };
 var OPEN_STATES = ['SUBMITTED', 'NEEDS_INFORMATION', 'QUOTED', 'AWAITING_PAYMENT', 'READY_FOR_ASSIGNMENT', 'SCHEDULED', 'IN_PROGRESS', 'ADMIN_REVIEW', 'CORRECTION_REQUIRED', 'CLIENT_REVIEW', 'ON_HOLD'];
 var STARTED = ['IN_PROGRESS', 'ADMIN_REVIEW', 'CORRECTION_REQUIRED', 'CLIENT_REVIEW', 'COMPLETED'];
-/* Pro levels. Levels 1-3 are cleaning; Levels 4-5 add inspections and pay more. Repairs & Damages is a trade skill approved separately, outside the levels. */
-var LEVEL_INFO = [null,
-  { name: 'Cleaner', unlocks: 'Standard home cleans' },
-  { name: 'Experienced cleaner', unlocks: 'Standard, End of Tenancy and Office cleans' },
-  { name: 'Senior cleaner', unlocks: 'All cleans, including Deep cleans' },
-  { name: 'Inspector', unlocks: 'Check-in and check-out inspections (up to 3 bedrooms), plus all cleans' },
-  { name: 'Senior inspector', unlocks: 'Inspections on every property size, including 4+ bedrooms, plus all cleans' }];
+/* Pro roles. A Pro can hold more than one: the roles follow the services they deliver.
+   Every role has three levels, unlocked by completed jobs and ratings in that role. Badge: "Pro Clerk · Level 3". */
+var ROLES = {
+  CLERK: { label: 'Pro Clerk', short: 'Clerk', icon: 'inventory', skills: ['INVENTORY', 'CHECK_IN', 'MID_TERM', 'CHECK_OUT'], unlocks: [null, 'Inspections up to 2 bedrooms', 'Inspections up to 4 bedrooms', 'Inspections on every property size'] },
+  CLEANER: { label: 'Pro Cleaner', short: 'Cleaner', icon: 'cleaning', skills: ['CLEANING'], unlocks: [null, 'Standard home cleans', 'Standard, End of Tenancy and Office cleans', 'All cleans, including Deep cleans'] },
+  TRADES: { label: 'Pro Trades', short: 'Trades', icon: 'settings', skills: ['REPAIRS_DAMAGES'], unlocks: [null, 'Repairs and maintenance', 'Repairs and maintenance, higher rate', 'Repairs and maintenance, top rate'] }
+};
+var ROLE_KEYS = ['CLERK', 'CLEANER', 'TRADES'];
+function roleOfSkill(k) { return k === 'CLEANING' ? 'CLEANER' : k === 'REPAIRS_DAMAGES' ? 'TRADES' : 'CLERK'; }
+function jobRole(j) { return roleOfSkill(svcKey(j)); }
+function proRoles(p) { var s = (p && p.skills) || []; return ROLE_KEYS.filter(function (r) { return ROLES[r].skills.some(function (k) { return s.indexOf(k) >= 0; }); }); }
+/* records from before roles kept one level from 1 to 5 (1-3 cleaning, 4-5 inspections) */
+function legacyRoleLevel(p, role) { var l = +(p.level || p.levelOverride || 1) || 1; return role === 'CLEANER' ? Math.min(3, l) : role === 'CLERK' ? (l >= 5 ? 3 : l >= 4 ? 2 : 1) : 1; }
+/* a Pro's level in one role; with no role, their highest level across the roles they hold */
+function proLevel(p, role) {
+  if (!p) return 1;
+  if (!role) return proRoles(p).reduce(function (a, r) { return Math.max(a, proLevel(p, r)); }, 1);
+  var l = p.levels && p.levels[role] != null ? +p.levels[role] : legacyRoleLevel(p, role); return Math.min(3, Math.max(1, l || 1));
+}
+function roleBadge(role, lv) { return ROLES[role].label + ' · Level ' + lv; }
+/* standards check: a Pro's first jobs in each role get a closer LISTD review */
+function standardsJobs() { return Math.max(0, +settings().standardsJobs || 5); }
+function roleJobs(proId, role) { return list('jobs').filter(function (j) { return j.proId === proId && jobRole(j) === role; }); }
+function standardsCheck(p, role) {
+  var n = standardsJobs(), done = roleJobs(p.id, role).filter(function (j) { return j.status === 'COMPLETED'; }).length, early = (p.standards || {})[role], passed = !!early || done >= n;
+  return { n: n, done: Math.min(done, n), passed: passed, early: early || null, label: passed ? 'Standards check passed' : 'New to LISTD · job ' + Math.min(n, done + 1) + ' of ' + n };
+}
+function newBadge(p, role) { return standardsCheck(p, role).passed ? '' : badge('New to LISTD', 'info'); }
 
 /* ---------- policies (Admin-configurable) ---------- */
 var DEFAULT_SETTINGS = {
   /* no phone number until the LISTD number is confirmed */
   company: { name: 'LISTD Inventory', address: 'Suite 41, 14-15 Triangle South, Clifton, Bristol', phone: '', email: 'support@listd.co.uk' },
   quoteValidityDays: 7, offerValidityHours: 12, reviewHours: 48, rescheduleHours: 24, proFeePct: 75,
-  levels: [{ minJobs: 0, minRating: 0, sharePct: 60 }, { minJobs: 5, minRating: 4.0, sharePct: 65 }, { minJobs: 15, minRating: 4.3, sharePct: 70 }, { minJobs: 25, minRating: 4.5, sharePct: 75 }, { minJobs: 40, minRating: 4.7, sharePct: 80 }],
+  /* what a Pro needs, in the role, before applying for each level; placeholders to confirm */
+  roleLevels: [{ minJobs: 0, minRating: 0 }, { minJobs: 10, minRating: 4.5 }, { minJobs: 30, minRating: 4.7 }], standardsJobs: 5,
   repairCategories: ['Plumbing', 'Electrical', 'Appliances', 'Fixtures & decor', 'Other'],
   guide: { INVENTORY: { base: 9000, bed: 1500 }, CHECK_IN: { base: 5500, bed: 1000 }, MID_TERM: { base: 5000, bed: 800 }, CHECK_OUT: { base: 5500, bed: 1000 }, light: { base: 6000, bed: 1500, bath: 1000 }, general: { base: 9000, bed: 2500, bath: 1500 }, deep: { base: 14000, bed: 4000, bath: 2500 } }
 };
@@ -119,14 +141,13 @@ function currentOffer(j) { return (j.offers || []).filter(function (o) { return 
 function latestReport(j) { return (j.reports || []).slice(-1)[0] || null; }
 function releasedReport(j) { return (j.reports || []).filter(function (r) { return r.status === 'RELEASED'; }).slice(-1)[0] || null; }
 
-function proLevel(p) { var l = p ? +(p.level || p.levelOverride || 1) : 1; return Math.min(5, Math.max(1, l || 1)); }
 function proStats(proId) {
   var jobs = list('jobs').filter(function (j) { return j.proId === proId; });
   var done = jobs.filter(function (j) { return j.status === 'COMPLETED'; }), rated = done.filter(function (j) { return j.rating && !j.rating.hidden; });
-  var n = done.length, pr = D.pros[proId], lv = proLevel(pr);
+  var n = done.length, pr = D.pros[proId], lv = proLevel(pr), roles = proRoles(pr);
   var paid = 0, payable = 0, pending = 0;
   jobs.forEach(function (j) { var s = settlement(j); if (s.status === 'PAID') paid += s.amountP; else if (s.status === 'ELIGIBLE') payable += s.amountP; else if (s.status === 'BLOCKED') pending += s.amountP; });
-  return { completed: n, level: lv, levelName: LEVEL_INFO[lv].name, rating: rated.length ? rated.reduce(function (a, j) { return a + j.rating.score; }, 0) / rated.length : null, ratings: rated.length, paid: paid, payable: payable, pending: pending, active: jobs.filter(function (j) { return ['SCHEDULED', 'IN_PROGRESS', 'CORRECTION_REQUIRED'].indexOf(j.status) >= 0; }).length };
+  return { completed: n, level: lv, roles: roles, levelName: roles.map(function (r) { return roleBadge(r, proLevel(pr, r)); }).join(', ') || 'No role yet', rating: rated.length ? rated.reduce(function (a, j) { return a + j.rating.score; }, 0) / rated.length : null, ratings: rated.length, paid: paid, payable: payable, pending: pending, active: jobs.filter(function (j) { return ['SCHEDULED', 'IN_PROGRESS', 'CORRECTION_REQUIRED'].indexOf(j.status) >= 0; }).length };
 }
 
 /* ---------- report templates ---------- */
@@ -252,7 +273,9 @@ function badge(text, tone, icon) { return '<span class="ld-badge' + (tone ? ' ld
 function payLabel(j) { var p = paidP(j), r = refundedP(j); return !p ? 'Not paid' : r >= p ? 'Refunded' : r ? 'Part refunded' : 'Paid'; }
 function payBadge(j) { var l = payLabel(j); return badge(l, l === 'Paid' ? 'success' : l === 'Not paid' ? '' : 'info', 'pound'); }
 function setBadge(j) { var s = settlement(j); return s.status === 'PAID' ? badge('Pro paid ' + P(s.amountP), 'success', 'escrow') : s.status === 'ELIGIBLE' ? badge('Payout eligible ' + P(s.amountP), 'brand', 'escrow') : s.status === 'BLOCKED' ? badge('Payout blocked', 'warning', 'escrow') : ''; }
-function levelBar(lv, name) { var s = ''; for (var i = 1; i <= 5; i++) s += '<i class="' + (i <= lv ? 'on' : '') + '"></i>'; return '<span class="ld-level"><span aria-hidden="true">' + s + '</span>Level ' + lv + ' · ' + esc(name) + '</span>'; }
+function levelBar(lv, text) { var s = ''; for (var i = 1; i <= 3; i++) s += '<i class="' + (i <= lv ? 'on' : '') + '"></i>'; return '<span class="ld-level"><span aria-hidden="true">' + s + '</span>' + esc(text) + '</span>'; }
+/* one badge per role the Pro holds, e.g. "Pro Clerk · Level 3", plus "New to LISTD" during the standards check */
+function roleBars(p) { var r = proRoles(p); return r.length ? r.map(function (x) { var l = proLevel(p, x); return '<span class="a-rolebar">' + levelBar(l, roleBadge(x, l)) + newBadge(p, x) + '</span>'; }).join(' ') : '<span class="a-fine">No role yet</span>'; }
 function initials(n) { return String(n || '?').split(/\s+/).map(function (w) { return w[0] || ''; }).join('').slice(0, 2).toUpperCase(); }
 function avatar(n, verified, size) { return '<span class="ld-avatar' + (size ? ' ld-avatar-' + size : '') + '"><span role="img" aria-label="' + esc(n) + '">' + esc(initials(n)) + '</span>' + (verified ? '<span class="v" title="Verified Pro">' + ic('check', 10) + '</span>' : '') + '</span>'; }
 function stars(n) { var s = ''; for (var i = 1; i <= 5; i++) s += '<span aria-hidden="true" style="color:' + (i <= Math.round(n) ? 'var(--live)' : 'var(--border-strong)') + '">★</span>'; return '<span title="' + (n ? n.toFixed(1) : 'No ratings') + ' out of 5"><span class="sr-only">' + (n ? n.toFixed(1) + ' out of 5' : 'No ratings') + '</span>' + s + '</span>'; }
@@ -264,7 +287,7 @@ function jobRow(j, who) {
   if (j.window && j.window.date) sub.push(winLabel(j.window));
   if (who === 'admin' || who === 'pro') { var c = D.clients[j.clientId]; if (c && who === 'admin') sub.push(esc(c.orgName || c.name)); }
   if (who !== 'pro' && j.proId && D.pros[j.proId]) sub.push('Pro: ' + esc(D.pros[j.proId].name));
-  var q = curQuote(j), right = who === 'pro' ? (currentOffer(j) && currentOffer(j).proId === S.proId ? P(currentOffer(j).feeP) : j.proId === S.proId ? P(proFeeP(j)) : '') : q ? P(q.totalP) : '';
+  var q = curQuote(j), right = who === 'pro' ? (currentOffer(j) && currentOffer(j).proId === S.proId ? P(currentOffer(j).feeP) : j.proId === S.proId ? P(proFeeP(j)) : !j.proId && j.status === 'READY_FOR_ASSIGNMENT' ? P(openFeeP(j, D.pros[S.proId])) : '') : q ? P(q.totalP) : '';
   var flag = openDispute(j) ? badge('Dispute open', 'danger', 'flag') : '';
   return '<button class="a-job" type="button" data-act="open-job" data-id="' + j.id + '" style="--c:' + k.c + '"><span class="bar"></span><span class="t"><span class="a-row" style="gap:8px">' + svcTag(j) + (j.scope && j.scope.clean ? badge(CLEANS[j.scope.clean].label) : '') + flag + '</span><b>' + esc(p.label || p.address || 'Property') + (p.postcode ? ', ' + esc(p.postcode) : '') + '</b><span>' + sub.join(' · ') + '</span></span><span class="r">' + statusPill(j.status, j) + '<span class="price">' + right + '</span></span></button>';
 }

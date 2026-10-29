@@ -112,18 +112,18 @@
     });
   }
 
-  // Pro level estimator on the For Pros page (real thresholds)
-  var LV = [[0, 5, 'L1', 'Trainee', 'Flex tier only, supervised jobs'], [6, 20, 'L2', 'Junior', 'Flex and Core tiers'], [21, 50, 'L3', 'Standard', 'All tiers, independent work'], [51, 100, 'L4', 'Senior', 'Priority jobs, mentoring access'], [101, 9999, 'L5', 'Expert', 'All tiers, tribunal-grade reports']];
+  // Pro level estimator on the For Pros page: three levels in every role, by completed jobs in that role (ratings also count)
+  var LV = [[0, 9, 'L1', 'Level 1', 'First 5 jobs get a closer LISTD review'], [10, 29, 'L2', 'Level 2', 'With a 4.5 rating or more'], [30, 9999, 'L3', 'Level 3', 'With a 4.7 rating or more']];
   var prosBand = document.querySelector('[data-view="pros"] .s-band .s-in > div:first-child');
   if (prosBand) {
     var w = document.createElement('div'); w.className = 'm-est';
-    w.innerHTML = '<label for="m-jobs">Jobs completed on LISTD <output id="m-jobs-out" for="m-jobs">24 jobs</output></label><input id="m-jobs" type="range" min="0" max="120" step="1" value="24" aria-describedby="m-jobs-res"><div class="res" id="m-jobs-res" aria-live="polite"><b></b><span></span></div>';
+    w.innerHTML = '<label for="m-jobs">Jobs completed in a role <output id="m-jobs-out" for="m-jobs">12 jobs</output></label><input id="m-jobs" type="range" min="0" max="40" step="1" value="12" aria-describedby="m-jobs-res"><div class="res" id="m-jobs-res" aria-live="polite"><b></b><span></span></div>';
     prosBand.appendChild(w);
     var inp = w.querySelector('input'), out = w.querySelector('output'), rb = w.querySelector('.res b'), rs = w.querySelector('.res span');
     var rows = document.querySelectorAll('[data-view="pros"] .s-levels .s-lv');
     function upd() {
       var n = +inp.value, idx = 0; for (var i = 0; i < LV.length; i++) if (n >= LV[i][0] && n <= LV[i][1]) idx = i;
-      out.textContent = n + (n === 120 ? '+' : '') + (n === 1 ? ' job' : ' jobs');
+      out.textContent = n + (n === 40 ? '+' : '') + (n === 1 ? ' job' : ' jobs');
       rb.textContent = LV[idx][2]; rs.innerHTML = LV[idx][3] + '<small>' + LV[idx][4] + '</small>';
       rows.forEach(function (r, k) { r.classList.toggle('m-on-level', k === idx); });
     }

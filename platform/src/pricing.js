@@ -16,19 +16,26 @@ var FURNISH = { unfurnished: 'Unfurnished', part: 'Part-furnished', furnished: '
 var REPORT_DUE = { INVENTORY: 'Report within 2 working days of the visit', CHECK_IN: 'Report within 1 working day of the visit', MID_TERM: 'Report within 2 working days of the visit', CHECK_OUT: 'Report within 2 working days of the visit', CLEANING: 'Before-and-after photos on the day', REPAIRS_DAMAGES: 'Completion photos and notes on the day' };
 var CLEAN_ADDONS = { oven: 'Oven clean', fridge: 'Fridge and freezer inside', cupboards: 'Inside cupboards', carpets: 'Carpet clean (per room)', windowsOut: 'Exterior windows' };
 var DEFAULT_PRICING = {
-  area: 'Bristol',
+  area: 'Bristol and Birmingham',
   rates: { INVENTORY: [8500, 10000, 12000, 14000, 16000], CHECK_IN: [6000, 6000, 6500, 7000, 7500], COMBO: [11000, 12500, 14500, 16500, 18500], CHECK_OUT: [7500, 9000, 11000, 13000, 15000], MID_TERM: [6000, 6500, 7500, 8500, 9500] },
   furnish: { part: 1000, furnishedSmall: 2000, furnishedLarge: 3000 },
   extraRoomP: 1000, outbuildingP: 1500, outdoorP: 1500,
   sched: { flexOffP: 1000, priorityP: 3000, priorityProP: 2000, flexDays: 5, standardDays: 2, priorityDays: 2, flexOpen: false, priorityOpen: true },
   floor: { minP: 2500, pct: 25 },
   costs: { payPct: 1.5, payFixedP: 20, opsP: 500, reworkPct: 3 },
-  pro: { attendP: 1000, furnishSharePct: 50, rateByLevel: [1400, 1500, 1600, 2000, 2200], minutes: { INVENTORY: [75, 30], CHECK_IN: [45, 5], CHECK_IN_COMBO: [40, 5], MID_TERM: [45, 10], CHECK_OUT: [65, 25] } },
+  /* hourly rate for each role and level, set by LISTD (placeholders to confirm) */
+  pro: { attendP: 1000, furnishSharePct: 50, rates: { CLERK: [1800, 2000, 2200], CLEANER: [1400, 1500, 1600], TRADES: [2000, 2300, 2600] }, minutes: { INVENTORY: [75, 30], CHECK_IN: [45, 5], CHECK_IN_COMBO: [40, 5], MID_TERM: [45, 10], CHECK_OUT: [65, 25] } },
   clean: { hourP: 2600, consumablesP: 800, kitP: 500, spreadPct: 15, hours: { standard: [1.5, 0.75, 0.5], deep: [3, 1.5, 1], eot: [3.5, 1.5, 1] }, officeM2PerHour: 60, officeMinH: 2, cond: { 'vacant-tidy': 1, 'vacant-dirty': 1.25, occupied: 1.1 }, minP: { standard: 6000, deep: 11000, eot: 12000, office: 6000 }, addons: { oven: 3500, fridge: 1500, cupboards: 2000, carpets: 2500 }, addonH: { oven: 1, fridge: 0.5, cupboards: 0.75, carpets: 0.75 } },
   repairs: { diagnosisP: 5000, diagnosisProP: 2500, labourProPct: 75 },
   rebate: { tier1: 10, pct: 5, tier2: 25 },
   taxPct: 0
 };
+/* coverage: Bristol and the South West get every service; Birmingham has cleaning now, with inspections and repairs coming soon.
+   Bristol and Birmingham share prices (London later). Areas are postcode areas, e.g. BS, BA, B. */
+var COVERAGE = { ALL: ['BS', 'BA', 'GL', 'SN', 'TA', 'EX', 'TQ', 'PL', 'TR', 'DT', 'BH', 'SP'], CLEANING: ['B'] };
+function pcArea(pc) { var m = String(pc || '').trim().toUpperCase().match(/^[A-Z]+/); return m ? m[0] : ''; }
+function coverageFor(pc) { var a = pcArea(pc); return COVERAGE.ALL.indexOf(a) >= 0 ? 'ALL' : COVERAGE.CLEANING.indexOf(a) >= 0 ? 'CLEANING' : ''; }
+function coverageBlock(pc, key) { var c = coverageFor(pc); if (c === 'ALL' || (c === 'CLEANING' && key === 'CLEANING')) return ''; return c === 'CLEANING' ? 'In Birmingham we offer cleaning now. ' + SVC[key].label + ' is coming soon.' : 'LISTD isn’t in ' + (pcArea(pc) || 'this area') + ' yet. We cover Bristol, the South West and Birmingham, and we’re coming to your area soon.'; }
 function pricing() { var s = (D.settings || {}).pricing || {}, d = DEFAULT_PRICING, o = {}; Object.keys(d).forEach(function (k) { o[k] = s[k] == null ? d[k] : (typeof d[k] === 'object' && !Array.isArray(d[k]) ? Object.assign({}, d[k], s[k]) : s[k]); }); return o; }
 function pounds(p) { return '£' + Math.round(p / 100); }
 function sizeIdx(beds) { beds = Math.max(0, Math.round(+beds || 0)); return beds >= 5 ? -1 : beds; }
@@ -52,15 +59,18 @@ function schedLine(mode) { var s = pricing().sched; return mode === 'priority' ?
 function furnishAdj(furn, beds) { var f = pricing().furnish; if (furn === 'part') return f.part; if (furn === 'furnished') return (+beds || 0) >= 3 ? f.furnishedLarge : f.furnishedSmall; return 0; }
 /* expected internal floor area for a size; much larger properties are reviewed before pricing */
 function areaUnusual(prop) { var a = +prop.area || 0, b = Math.max(0, +prop.bedrooms || 0); return a > 0 && a > (40 + 30 * b) * 1.5; }
-function proRate(level) { var r = pricing().pro.rateByLevel; return r[Math.min(5, Math.max(1, level || 4)) - 1]; }
+function proRate(role, level) { var r = (pricing().pro.rates || DEFAULT_PRICING.pro.rates)[role] || DEFAULT_PRICING.pro.rates[role] || DEFAULT_PRICING.pro.rates.CLERK; return r[Math.min(3, Math.max(1, level || 1)) - 1]; }
+/* the role and level a quote's workload was priced at; older quotes stored a level from 1 to 5 */
+function baseRole(b) { return b.role || (+b.level >= 4 ? 'CLERK' : 'CLEANER'); }
+function baseLevel(b) { return b.role ? +b.level || 1 : legacyRoleLevel({ level: b.level }, baseRole(b)); }
 function minutesFor(key, beds) { var m = pricing().pro.minutes[key] || [60, 10]; return m[0] + m[1] * Math.max(0, +beds || 0); }
 /* Pro fees are rounded to the nearest 50p so every offer reads as a clean figure */
-function feeFromBase(b, level) { if (!b) return 0; return Math.round(((b.attendP || 0) + (b.minutes || 0) / 60 * proRate(level || b.level) + (b.allowP || 0)) / 50) * 50; }
+function feeFromBase(b, level) { if (!b) return 0; return Math.round(((b.attendP || 0) + (b.minutes || 0) / 60 * proRate(baseRole(b), level || baseLevel(b)) + (b.allowP || 0)) / 50) * 50; }
 /* how a Pro fee is built, line by line, for the Pro and for LISTD */
 function feeParts(b, level) {
-  if (!b) return []; level = level || b.level; var r = proRate(level), out = [], m = b.minutes || 0;
+  if (!b) return []; level = level || baseLevel(b); var r = proRate(baseRole(b), level), out = [], m = b.minutes || 0;
   if (b.attendP) out.push([b.kitOnly ? 'Kit allowance' : 'Attendance allowance', b.attendP]);
-  if (m) out.push(['Expected time: ' + ((m >= 60 ? Math.floor(m / 60) + 'h ' : '') + (m % 60 ? m % 60 + 'm' : '')).trim() + ' at ' + P(r) + '/h (Level ' + level + ')', Math.round(m / 60 * r)]);
+  if (m) out.push(['Expected time: ' + ((m >= 60 ? Math.floor(m / 60) + 'h ' : '') + (m % 60 ? m % 60 + 'm' : '')).trim() + ' at ' + P(r) + '/h (' + roleBadge(baseRole(b), level) + ')', Math.round(m / 60 * r)]);
   (b.allow || []).forEach(function (a) { out.push([a[0], a[1]]); });
   if (!b.allow && b.allowP) out.push(['Complexity and urgency allowances', b.allowP]);
   var sum = out.reduce(function (a, x) { return a + x[1]; }, 0), fee = feeFromBase(b, level); if (fee !== sum) out.push(['Rounding to the nearest 50p', fee - sum]);
@@ -82,13 +92,14 @@ function priceInspection(k, prop, o) {
   var allow = 0, items = [], extra = Math.max(0, (+prop.bathrooms || 1) - 1) + Math.max(0, (+prop.kitchens || 1) - 1) + Math.max(0, +prop.receptions || 0);
   if (!comboCI) {
     var fa = furnishAdj(prop.furnishing, beds); if (fa) { lines.push(L('Furnishing: ' + FURNISH[prop.furnishing].toLowerCase(), fa)); allow += fa * pr.pro.furnishSharePct / 100; items.push(['Furnishing allowance (' + FURNISH[prop.furnishing].toLowerCase() + ')', Math.round(fa * pr.pro.furnishSharePct / 100)]); }
-    if (extra) { lines.push(L('Additional bathroom, kitchen or reception room', pr.extraRoomP, 'svc', extra)); allow += extra * pr.extraRoomP / 2; items.push(['Extra rooms allowance (' + extra + ')', Math.round(extra * pr.extraRoomP / 2)]); }
+    /* every extra room is its own visible line */
+    if (extra) { [['Extra bathroom', Math.max(0, (+prop.bathrooms || 1) - 1)], ['Extra kitchen', Math.max(0, (+prop.kitchens || 1) - 1)], ['Extra reception room', Math.max(0, +prop.receptions || 0)]].forEach(function (x) { for (var e = 1; e <= x[1]; e++) lines.push(L(x[0] + (x[1] > 1 ? ' ' + e : ''), pr.extraRoomP)); }); allow += extra * pr.extraRoomP / 2; items.push(['Extra rooms allowance (' + extra + ')', Math.round(extra * pr.extraRoomP / 2)]); }
     if (prop.outbuildings) { lines.push(L('Outbuildings', pr.outbuildingP)); allow += pr.outbuildingP / 2; items.push(['Outbuildings allowance', Math.round(pr.outbuildingP / 2)]); }
-    if (prop.outdoor) { lines.push(L('Extensive outdoor areas', pr.outdoorP)); allow += pr.outdoorP / 2; items.push(['Outdoor areas allowance', Math.round(pr.outdoorP / 2)]); }
+    if (prop.outdoor) { lines.push(L('Large outdoor area', pr.outdoorP)); allow += pr.outdoorP / 2; items.push(['Outdoor areas allowance', Math.round(pr.outdoorP / 2)]); }
     var sl = schedLine(o.sched); if (sl) { lines.push(sl); if (o.sched === 'priority') { allow += pr.sched.priorityProP; items.push(['Priority allowance', pr.sched.priorityProP]); } }
   }
   var mins = minutesFor(comboCI ? 'CHECK_IN_COMBO' : k, beds);
-  return { lines: lines, proBase: { attendP: comboCI ? 0 : pr.pro.attendP, minutes: mins, allowP: Math.round(allow), allow: items, level: 4 }, durationMin: Math.round(mins / 15) * 15, why: '' };
+  return { lines: lines, proBase: { attendP: comboCI ? 0 : pr.pro.attendP, minutes: mins, allowP: Math.round(allow), allow: items, role: 'CLERK', level: beds <= 2 ? 1 : beds <= 4 ? 2 : 3 }, durationMin: Math.round(mins / 15) * 15, why: '' };
 }
 
 /* ---- cleaning: preliminary estimate, then a fixed approved quote ---- */
@@ -109,7 +120,7 @@ function priceCleaning(prop, sc, o) {
   var sl = schedLine(o.sched); if (sl) lines.push(sl);
   var sub = lines.reduce(function (a, l) { return a + l.q * l.u; }, 0), sp = c.spreadPct / 100;
   return { lines: lines, hours: h, estLowP: Math.floor(sub * (1 - sp) / 500) * 500, estHighP: Math.ceil(sub * (1 + sp) / 500) * 500, needsQuote: (sc.addons || []).indexOf('windowsOut') >= 0 || t === 'office',
-    proBase: { attendP: c.kitP, kitOnly: true, minutes: Math.round(h * 60), allowP: o.sched === 'priority' ? pricing().sched.priorityProP : 0, allow: o.sched === 'priority' ? [['Priority allowance', pricing().sched.priorityProP]] : [], level: t === 'deep' ? 3 : t === 'standard' ? 1 : 2 }, durationMin: Math.round(h * 60 / 15) * 15 };
+    proBase: { attendP: c.kitP, kitOnly: true, minutes: Math.round(h * 60), allowP: o.sched === 'priority' ? pricing().sched.priorityProP : 0, allow: o.sched === 'priority' ? [['Priority allowance', pricing().sched.priorityProP]] : [], role: 'CLEANER', level: t === 'deep' ? 3 : t === 'standard' ? 1 : 2 }, durationMin: Math.round(h * 60 / 15) * 15 };
 }
 
 /* ---- repairs: fixed task price where the scope is known; a paid diagnosis where it isn't ---- */
@@ -223,7 +234,7 @@ function vAdminPricing() {
     '<h3>One complexity adjustment</h3><div class="a-prg">' + field('pr-fp', 'Part-furnished (£)', gp('f_part', pr.furnish.part)) + field('pr-fs', 'Furnished, studio–2 bed (£)', gp('f_small', pr.furnish.furnishedSmall)) + field('pr-fl', 'Furnished, 3–4 bed (£)', gp('f_large', pr.furnish.furnishedLarge)) + field('pr-xr', 'Each extra bathroom, kitchen or reception (£)', gp('x_room', pr.extraRoomP)) + field('pr-ob', 'Outbuildings (£)', gp('x_out', pr.outbuildingP)) + field('pr-od', 'Extensive outdoor areas (£)', gp('x_outdoor', pr.outdoorP)) + '</div><p class="a-fine">Included: the selected bedrooms, one kitchen, one bathroom, one living room and ordinary hallways. Heavily furnished, 5+ bedrooms and unusually large properties go to a custom quote. No per-bedroom fee on top of the size price.</p>' +
     '<h3>Scheduling options</h3><div class="a-prg">' + field('pr-po', 'Priority premium (£)', gp('s_pri', pr.sched.priorityP)) + field('pr-pp', 'Of which to the Pro (£)', gp('s_pripro', pr.sched.priorityProP)) + field('pr-pd', 'Priority: dates within (working days)', n('s_prid', pr.sched.priorityDays), 'Later dates are Standard.') + '</div>' +
     '<label class="a-check"><input type="checkbox" name="s_priOpen"' + (pr.sched.priorityOpen ? ' checked' : '') + '> Offer Priority now <span class="a-fine">Turn off when Pro capacity isn’t there</span></label>' +
-    '<h3>Pro fees from workload</h3><p class="a-fine">Pro fee = attendance allowance + expected on-site and reporting time × the Pro’s hourly rate + approved complexity and urgency allowances. The fee is agreed before the Pro accepts.</p><div class="a-prg">' + field('pr-at', 'Attendance allowance (£)', gp('p_att', pr.pro.attendP)) + field('pr-fsh', 'Pro share of complexity adjustments (%)', n('p_fsh', pr.pro.furnishSharePct)) + [1, 2, 3, 4, 5].map(function (l) { return field('pr-rl' + l, 'Level ' + l + ' hourly rate (£)', gp('p_rate_' + l, pr.pro.rateByLevel[l - 1])); }).join('') + '</div>' +
+    '<h3>Pro fees from workload</h3><p class="a-fine">Pro fee = attendance allowance + expected on-site and reporting time × the Pro’s hourly rate + approved complexity and urgency allowances. The fee is agreed before the Pro accepts.</p><div class="a-prg">' + field('pr-at', 'Attendance allowance (£)', gp('p_att', pr.pro.attendP)) + field('pr-fsh', 'Pro share of complexity adjustments (%)', n('p_fsh', pr.pro.furnishSharePct)) + ROLE_KEYS.map(function (r) { return [1, 2, 3].map(function (l) { return field('pr-rl-' + r + l, roleBadge(r, l) + ' hourly rate (£)', gp('p_rate_' + r + '_' + l, proRate(r, l))); }).join(''); }).join('') + '</div>' +
     '<div class="a-tw"><table><thead><tr><th>Expected minutes (on site + report)</th><th>Base</th><th>Each bedroom</th></tr></thead><tbody>' + [['INVENTORY', 'Inventory & Condition'], ['CHECK_IN', 'Standalone check-in'], ['CHECK_IN_COMBO', 'Check-in in the same visit'], ['MID_TERM', 'Mid-term'], ['CHECK_OUT', 'Check-out']].map(function (x) { var m = pr.pro.minutes[x[0]]; return '<tr><td class="sub">' + x[1] + '</td><td>' + n('m_' + x[0] + '_0', m[0]) + '</td><td>' + n('m_' + x[0] + '_1', m[1]) + '</td></tr>'; }).join('') + '</tbody></table></div>' +
     '<h3>Cleaning</h3><div class="a-prg">' + field('pr-ch', 'Client price per cleaner-hour (£)', gp('c_hour', pr.clean.hourP)) + field('pr-cc', 'Equipment and consumables (£)', gp('c_cons', pr.clean.consumablesP)) + field('pr-ck', 'Pro kit allowance (£)', gp('c_kit', pr.clean.kitP)) + field('pr-cs', 'Estimate range (±%)', n('c_spread', pr.clean.spreadPct)) + Object.keys(pr.clean.minP).map(function (t) { return field('pr-cm-' + t, 'Minimum · ' + CLEANS[t].label + ' (£)', gp('c_min_' + t, pr.clean.minP[t])); }).join('') + Object.keys(pr.clean.addons).map(function (a) { return field('pr-ca-' + a, CLEAN_ADDONS[a] + ' (£)', gp('c_add_' + a, pr.clean.addons[a])); }).join('') + '</div>' +
     '<h3>Repairs &amp; Maintenance</h3><div class="a-prg">' + field('pr-dg', 'Diagnostic visit (£)', gp('d_fee', pr.repairs.diagnosisP)) + field('pr-dp', 'Diagnostic visit Pro fee (£)', gp('d_pro', pr.repairs.diagnosisProP)) + field('pr-lp', 'Pro share of labour (%)', n('d_lab', pr.repairs.labourProPct)) + '</div>' +
@@ -238,7 +249,7 @@ function readPricingForm(fd) {
   pr.furnish = { part: pp('f_part', pr.furnish.part), furnishedSmall: pp('f_small', pr.furnish.furnishedSmall), furnishedLarge: pp('f_large', pr.furnish.furnishedLarge) };
   pr.extraRoomP = pp('x_room', pr.extraRoomP); pr.outbuildingP = pp('x_out', pr.outbuildingP); pr.outdoorP = pp('x_outdoor', pr.outdoorP);
   pr.sched = { flexOffP: pp('s_flex', pr.sched.flexOffP), priorityP: pp('s_pri', pr.sched.priorityP), priorityProP: pp('s_pripro', pr.sched.priorityProP), flexDays: nn('s_flexd', pr.sched.flexDays), standardDays: nn('s_stdd', pr.sched.standardDays), priorityDays: Math.max(1, nn('s_prid', pr.sched.priorityDays)), priorityOpen: fd.has('s_priOpen'), flexOpen: false };
-  pr.pro.attendP = pp('p_att', pr.pro.attendP); pr.pro.furnishSharePct = Math.min(100, nn('p_fsh', pr.pro.furnishSharePct)); pr.pro.rateByLevel = [1, 2, 3, 4, 5].map(function (l) { return pp('p_rate_' + l, pr.pro.rateByLevel[l - 1]); });
+  pr.pro.attendP = pp('p_att', pr.pro.attendP); pr.pro.furnishSharePct = Math.min(100, nn('p_fsh', pr.pro.furnishSharePct)); var rates = {}; ROLE_KEYS.forEach(function (r) { rates[r] = [1, 2, 3].map(function (l) { return pp('p_rate_' + r + '_' + l, proRate(r, l)); }); }); pr.pro.rates = rates;
   Object.keys(pr.pro.minutes).forEach(function (k) { pr.pro.minutes[k] = [nn('m_' + k + '_0', pr.pro.minutes[k][0]), nn('m_' + k + '_1', pr.pro.minutes[k][1])]; });
   pr.clean.hourP = pp('c_hour', pr.clean.hourP); pr.clean.consumablesP = pp('c_cons', pr.clean.consumablesP); pr.clean.kitP = pp('c_kit', pr.clean.kitP); pr.clean.spreadPct = nn('c_spread', pr.clean.spreadPct);
   Object.keys(pr.clean.minP).forEach(function (t) { pr.clean.minP[t] = pp('c_min_' + t, pr.clean.minP[t]); }); Object.keys(pr.clean.addons).forEach(function (a) { pr.clean.addons[a] = pp('c_add_' + a, pr.clean.addons[a]); });

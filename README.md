@@ -104,9 +104,9 @@ Links that leave the site:
 
 | Product | What it covers |
 |---|---|
-| Client | Onboarding for four client types. Properties. Requests for any mix of six services in one booking: Inventory, Check-In (tenant walk-through and sign-off), Mid-Term, Check-Out (end-of-tenancy condition and sign-off), Repairs & Damages, and Cleaning (Light, General or Deep). Instant fixed prices for inspections from the rate card, Flex / Standard / Priority scheduling, cleaning estimates then fixed quotes, repair invoices or paid diagnosis, portfolio rebates, and test payments. Report review, disputes, ratings, receipts. Settings with optional two-factor. |
-| Pro | Sign-up with email and password, or joining by Admin invitation. Onboarding with documents and payouts. Offers, schedule, clock-in and out with photos. Inspection reports in the LISTD Inventory format with AI-drafted descriptions the Pro checks, plus the PDF. Cleaning and repair reports. Earnings. Training & level. |
-| Admin | Overview and work queues. Analytics: bottom-line drivers ranked by impact. Pricing: rate card, Pro fee model, contribution floor, rebates and pilot measures. Requests table. Assignments calendar. Quote builder, invoicing for repairs and Create invoice. Report reviews. Disputes and finance. Pros table, Pro detail pages, invitations, applications and levels. Training library. Clients, properties, catalogue and policies, audit log. Settings › Users & roles (Main admin, Sub-admin, Operations). |
+| Client | Onboarding for four client types. Properties. Bookings for any mix of six services at once: Inventory, Check-In (tenant walk-through and sign-off), Mid-Term, Check-Out (end-of-tenancy condition and sign-off), Repairs & Maintenance, and Cleaning (Light, General or Deep). Instant fixed prices for inspections from the rate card, Flex / Standard / Priority scheduling, cleaning estimates then fixed quotes, repair invoices or paid diagnosis, portfolio rebates, and test payments. Report review, disputes, ratings, receipts. Settings with optional two-factor. Job stages: Booked → Accepted → In progress → LISTD review → Ready to approve → Approved. Quotes and Receipts, with a VAT invoice download. Coverage: every service in Bristol and the South West; cleaning in Birmingham. |
+| Pro | Sign-up with email and password, or joining by Admin invitation. Onboarding with documents and payouts. Roles (Pro Clerk, Pro Cleaner, Pro Trades) with three levels each. Open jobs near them and offers from LISTD, schedule, clock-in and out with photos. Inspection reports in the LISTD Inventory format with AI-drafted descriptions the Pro checks, plus the PDF. Cleaning and repair reports. Earnings. Training & levels, standards check (“New to LISTD”), weekly payouts. |
+| Admin | Overview and work queues. Analytics: bottom-line drivers ranked by impact. Pricing: rate card, Pro fee model, contribution floor, rebates and pilot measures. Bookings table. Assignments calendar. Quote builder, invoicing for repairs and Create invoice. Report reviews. Disputes and finance. Pros table, Pro detail pages, invitations, applications, roles and levels, standards check. Training library. Clients, properties, catalogue and policies, audit log. Settings › Users & roles (Main admin, Sub-admin, Operations). |
 
 ### Build
 
@@ -144,9 +144,9 @@ make test
 | `e2e_cross_portal.py` | Pro sign-in with an existing client login, and "Set up sign-in" |
 | `e2e_invite.py` | Admin invites a Pro: code, link, resend, cancel. Pro verifies, creates a password and onboards |
 | `e2e_staff.py` | Users & roles: Main admin, invited Sub-admin and Operations, access limits, ownership transfer |
-| `e2e_levels.py` | Trainings, join and level applications, training gate for Levels 4 and 5, job eligibility by level |
+| `e2e_levels.py` | Role trainings, joining with per-role starting levels, training gates, standards check passed early, level applications per role, eligibility by role level, accepting an open job |
 | `e2e_invoicing.py` | Admin creates repair invoices, for a new repair or an existing request |
-| `e2e_services.py` | The six services, booking several at once as linked requests, per-service details, baselines, Pro eligibility by skill and level |
+| `e2e_services.py` | The six services, booking several at once as linked bookings, per-service details, baselines, Pro eligibility by skill and role level |
 | `e2e_pricing.py` | Pilot pricing: rate card, furnishing, same-visit inventory + check-in, Flex and Priority, instant quotes, cleaning estimates, diagnosis credit, Pro fees, contribution floor, rebates, Admin Pricing |
 | `e2e_analytics.py` | Admin Analytics: contribution bridge, driver formula, levers ranked by impact, funnel, service mix, access by role |
 | `e2e_quote_update.py` | Issued quotes show as sent to the client; Update quote needs a reason, supersedes the old version and notifies the client |

@@ -55,9 +55,9 @@ with sync_playwright() as pw:
         for d in range(7): p.check('input[name=days][value="%d"]'%d)
         for s in ['morning','afternoon','evening']: p.check('input[name=slots][value=%s]'%s)
         btn('Save & continue')
-        for i in range(4): p.locator('input[data-up]').nth(i).set_input_files(IMG); W(500)
+        for i in range(p.locator('input[data-up]').count()): p.locator('input[data-up]').nth(i).set_input_files(IMG); W(500)
         shot(p,'08-pro-docs'); btn('Continue'); p.fill('#pr-l4','1234'); btn('Save & continue'); shot(p,'09-pro-submit'); p.check('#pob-terms'); btn('Submit for review'); log('pro submitted')
-        role('admin'); nav('pros'); shot(p,'10-admin-pros'); p.locator('.a-main tr.click').first.click(); W(); shot(p,'10b-admin-pro'); p.select_option('form[data-form=pro-review] select[name=level]','4'); p.locator('form[data-form=pro-review] button[value=APPROVED]').first.click(); W(); log('pro approved at level '+str(p.evaluate("() => proLevel(Object.values(D.pros)[0])")))
+        role('admin'); nav('pros'); shot(p,'10-admin-pros'); p.locator('.a-main tr.click').first.click(); W(); shot(p,'10b-admin-pro'); [p.select_option('form[data-form=pro-review] select[name=%s]' % n, '3') for n in p.eval_on_selector_all('form[data-form=pro-review] select[name^=level_]', 'els => els.map(e => e.name)')]; p.locator('form[data-form=pro-review] button[value=APPROVED]').first.click(); W(); log('pro approved at level '+str(p.evaluate("() => proLevel(Object.values(D.pros)[0])")))
         openref('LJ-1001'); p.select_option('#of-pro', index=1); p.fill('#of-date',D1); shot(p,'11-offer'); btn('Send offer'); log('offered')
         role('pro'); nav('offers'); p.locator('.a-main .a-job').first.click(); W(); shot(p,'12-pro-offer'); btn('Accept job'); log('accepted '+str(state('LJ-1001')))
         up('input[data-up*="clock-in"]'); btn('Clock in'); log('clocked in '+str(state('LJ-1001')))
@@ -66,16 +66,16 @@ with sync_playwright() as pw:
             p.locator('input[data-up*="\\"item\\":\\"room\\""]').nth(i).set_input_files(IMG); W(300)
         p.evaluate("""() => { var j=Object.values(D.jobs).find(x=>x.ref==='LJ-1001'), d=draftOf(j);
           d.schedule.forEach(function(r,i){ if(i>0) r.value = SCHED_OPTS[r.kind][r.kind==='clean'?1:r.kind==='ext'?0:2]; });
-          d.rooms.forEach(function(rm){ rm.items.forEach(function(it){ it.desc = 'White painted ' + it.name.toLowerCase() + '.'; }); });
+          d.rooms.forEach(function(rm){ rm.items.forEach(function(it){ it.desc = 'White painted ' + it.name.toLowerCase() + '.'; it.cond = 'good'; }); });
           d.meters.forEach(function(m){ m.na = true; }); d.keys[0].desc = 'Two sets of tenant keys.'; d.signoff = { name: 'Jo Tenant', status: 'signed', note: '' }; saveDraft(j.id); render(); }""")
         W(900)
         up('input[data-up*="clock-out"]'); p.locator('form[data-form=clock-out] button[type=submit]').click(); W(); shot(p,'13-pro-report'); btn('Submit report'); log('report submitted '+str(state('LJ-1001')))
         role('admin'); nav('reviews'); p.locator('.a-main tr.click').first.click(); W(); shot(p,'14-admin-review'); p.fill('form[data-form=return] input','Add a note on the hallway scuff'); p.locator('form[data-form=return] button').click(); W(); log('returned '+str(state('LJ-1001')))
         role('pro'); openref('LJ-1001'); p.locator('textarea[id^="c-"]').first.fill('Small scuff by lock'); W(900); btn('Submit report'); log('resubmitted '+str(state('LJ-1001')))
         role('admin'); openref('LJ-1001'); btn('Release to client'); log('released '+str(state('LJ-1001')))
-        role('client'); openref('LJ-1001'); shot(p,'15-client-review'); btn('Request corrections'); p.fill('#mx-t','Please add gas reading'); btn('Send request'); log('correction '+str(state('LJ-1001')))
+        role('client'); openref('LJ-1001'); shot(p,'15-client-review'); btn('Ask for corrections'); p.fill('#mx-t','Please add gas reading'); btn('Send request'); log('correction '+str(state('LJ-1001')))
         role('pro'); openref('LJ-1001'); p.locator('[data-mna="0"]').uncheck(); W(); p.fill('#mt-0-reading','11872'); W(900); btn('Submit report'); role('admin'); openref('LJ-1001'); btn('Release to client')
-        role('client'); openref('LJ-1001'); btn('Accept report'); p.click('[data-act=star][data-n="5"]'); p.locator('form[data-form=rate] button[type=submit]').click(); W(); shot(p,'16-client-complete'); log('completed '+str(state('LJ-1001')))
+        role('client'); openref('LJ-1001'); btn('Approve report'); p.click('[data-act=star][data-n="5"]'); p.locator('form[data-form=rate] button[type=submit]').click(); W(); shot(p,'16-client-complete'); log('completed '+str(state('LJ-1001')))
         role('admin'); nav('finance'); shot(p,'17-finance'); p.locator('[data-act=payout]').first.click(); W(); log('payout '+str(state('LJ-1001')))
         # ---- check-out with baseline
         role('client'); nav('jobs'); p.locator('.a-main [data-go=new]').first.click(); W(); submit(); p.click('label.a-opt:has(input[value=CHECK_OUT])'); submit(); shot(p,'18-checkout-baseline'); base_ok=p.locator('text=Baseline found').count(); opt(p, '#w-occ', 'Jo Tenant'); p.fill('#w-keys','Collect 2 sets'); submit(); submit(); p.fill('#w-date',D2); submit(); submit(); log('check-out submitted, baseline banner=%d'%base_ok)
@@ -93,7 +93,7 @@ with sync_playwright() as pw:
         role('admin'); openref('LJ-1003'); btn('Release to client')
         role('client'); openref('LJ-1003'); p.locator('[data-act=dispute]').first.click(); W(); p.fill('#md-t','Still drips slightly'); btn('Open dispute'); log('disputed '+str(state('LJ-1003')))
         role('admin'); openref('LJ-1003'); shot(p,'20-admin-dispute'); p.select_option('#rs-o','PARTIAL_REFUND'); p.fill('#rs-amt','20'); p.fill('#rs-r','Minor drip confirmed from photos'); btn('Record outcome'); log('resolved '+str(state('LJ-1003')))
-        role('client'); openref('LJ-1003'); btn('Accept report'); role('admin'); openref('LJ-1003'); p.locator('[data-act=payout]').first.click(); W(); log('repair payout '+str(state('LJ-1003'))+' fee='+str(p.evaluate("proFeeP(Object.values(D.jobs).find(x=>x.ref==='LJ-1003'))")))
+        role('client'); openref('LJ-1003'); btn('Approve the finished job'); role('admin'); openref('LJ-1003'); p.locator('[data-act=payout]').first.click(); W(); log('repair payout '+str(state('LJ-1003'))+' fee='+str(p.evaluate("proFeeP(Object.values(D.jobs).find(x=>x.ref==='LJ-1003'))")))
         # ---- cleaning, auto-complete
         role('client'); nav('jobs'); p.locator('.a-main [data-go=new]').first.click(); W(); submit(); p.click('label.a-opt:has(input[value=CLEANING])'); submit(); p.click('label.a-opt:has(input[value=deep])'); submit(); submit(); p.fill('#w-date',D2); p.select_option('#w-slot','afternoon'); submit(); submit()
         role('admin'); openref('LJ-1004'); (btn('Issue quote to client') if p.locator('form[data-form=quote]').count() else None); role('client'); openref('LJ-1004'); btn('Accept quote'); p.locator('[data-act=pay]').click(); W()

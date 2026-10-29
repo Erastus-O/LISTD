@@ -26,7 +26,7 @@ with sync_playwright() as pw:
         part1: T('INVENTORY', 1, 'part'), furn3: T('CHECK_OUT', 3, 'furnished'), flex2: T('CHECK_OUT', 2, 'unfurnished', { sched: 'flex' }),
         five: T('INVENTORY', 5), heavy: T('INVENTORY', 2, 'heavy'), bigArea: priceInspection('INVENTORY', { bedrooms: 2, area: 300 }).custom ? 'custom' : 'priced',
         extra: T('INVENTORY', 2, 'unfurnished') !== undefined && priceInspection('INVENTORY', { bedrooms: 2, bathrooms: 2, kitchens: 1, receptions: 1, furnishing: 'unfurnished' }).lines.reduce((a, l) => a + l.q * l.u, 0) / 100,
-        fee2: feeFromBase(priceInspection('INVENTORY', { bedrooms: 2, furnishing: 'unfurnished' }).proBase, 4) / 100,
+        fee2: feeFromBase(priceInspection('INVENTORY', { bedrooms: 2, furnishing: 'unfurnished' }).proBase, 2) / 100,
         c120: contribution(12000, 5500), floor: contribution(6000, 2500).floorP / 100,
         days: [workDaysUntil(addWorkDays('2026-10-23', 2), '2026-10-23'), addWorkDays('2026-10-23', 1)],
         clean: (() => { var x = priceCleaning({ bedrooms: 2, bathrooms: 1 }, { clean: 'eot', condition: 'vacant-tidy' }); return [x.hours, x.estLowP / 100, x.estHighP / 100]; })(),
@@ -39,7 +39,7 @@ with sync_playwright() as pw:
     check(r['part1'] == 110 and r['furn3'] == 160 and r['flex2'] == 110, 'part-furnished +£10, furnished 3-bed +£30, no Flex discount any more')
     check(r['five'] == 'custom' and r['heavy'] == 'custom' and r['bigArea'] == 'custom', '5+ bedrooms, heavily furnished and unusual floor areas go to a custom quote')
     check(r['extra'] == 140, 'extra bathroom and reception room add £10 each (got %s)' % r['extra'])
-    check(r['fee2'] == 55, 'Pro fee from workload: 2-bed inventory £55 (got %s)' % r['fee2'])
+    check(r['fee2'] == 55, 'Pro fee from workload: 2-bed inventory at Pro Clerk Level 2 £55 (got %s)' % r['fee2'])
     check(r['c120']['contribP'] >= r['c120']['floorP'] and r['floor'] == 25, 'contribution floor: £25 or 25%, whichever is higher')
     check(r['days'] == [2, '2026-10-26'], 'working days skip weekends')
     check(r['clean'][0] == 6.5 and r['clean'][1] < r['clean'][2], 'cleaning estimate from cleaner-hours ' + str(r['clean']))
@@ -86,7 +86,7 @@ with sync_playwright() as pw:
     p.locator('[data-act=grp-pay]').click(); W()
     check(p.evaluate("() => Object.values(D.jobs).map(j => [j.status, paidP(j)])") == [['READY_FOR_ASSIGNMENT', 13000], ['READY_FOR_ASSIGNMENT', 6500]], 'one click accepts and pays both quotes (£130 + £65)')
     check(p.evaluate("() => Object.values(D.jobs).map(j => proFeeP(j) % 50)") == [0, 0], 'Pro fees are rounded to 50p')
-    parts = p.evaluate("() => { var j = Object.values(D.jobs).find(x => x.type === 'INVENTORY'), b = acceptedQuote(j).proBase; return [feeParts(b, 4).map(x => x[0].split(' (')[0].split(':')[0]), feeParts(b, 4).reduce((a, x) => a + x[1], 0), feeFromBase(b, 4)]; }")
+    parts = p.evaluate("() => { var j = Object.values(D.jobs).find(x => x.type === 'INVENTORY'), b = acceptedQuote(j).proBase; return [feeParts(b, 2).map(x => x[0].split(' (')[0].split(':')[0]), feeParts(b, 2).reduce((a, x) => a + x[1], 0), feeFromBase(b, 2)]; }")
     check(parts[0] == ['Attendance allowance', 'Expected time', 'Furnishing allowance', 'Priority allowance'] and parts[1] == parts[2] == 8500, 'Pro fee breakdown adds up: ' + str(parts))
     # ---- cleaning estimate + diagnosis ----
     p.evaluate("go('new')"); W(); submit(); p.click('label.a-opt:has(input[value=CLEANING])'); p.click('label.a-opt:has(input[value=REPAIRS_DAMAGES])'); submit()

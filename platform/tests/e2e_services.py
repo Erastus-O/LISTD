@@ -22,7 +22,7 @@ with sync_playwright() as pw:
     p.fill('#p-lbl', 'Pulteney Flat 3'); p.fill('#p-addr', 'Flat 3, 22 Pulteney Street, Bath'); p.fill('#p-pc', 'ba2 4ds'); p.fill('#p-bed', '2'); p.select_option('#p-furn', 'furnished'); p.fill('#p-acode', 'Key safe 4821'); p.fill('#p-cn', 'Jo Tenant'); p.fill('#p-cp', '07700 900001'); btn('Save property'); btn('Finish setup')
     p.evaluate("go('new')"); W(); submit()
     labels = p.locator('.a-multi .a-opt b').all_inner_texts()
-    check(labels == ['Inventory', 'Check-In', 'Mid-Term', 'Check-Out', 'Repairs & Damages', 'Cleaning'], 'six services offered in order: ' + ', '.join(labels))
+    check(labels == ['Inventory', 'Check-In', 'Mid-Term', 'Check-Out', 'Repairs & Maintenance', 'Cleaning'], 'six services offered in order: ' + ', '.join(labels))
     for k in ['INVENTORY', 'MID_TERM', 'REPAIRS_DAMAGES', 'CLEANING']: p.click('label.a-opt:has(input[value=%s])' % k)
     check(p.locator('#w-svc-count').inner_text() == '4 selected', 'selection count updates')
     p.screenshot(path=OUT + 'sv1-services.png', full_page=True)
@@ -31,7 +31,7 @@ with sync_playwright() as pw:
     p.fill('#w-keys', '1 set in key safe'); p.fill('#w-occ', 'Jo Tenant'); p.click('label.a-opt:has(input[name=clean][value=deep])'); p.fill('#w-loc', 'Bathroom'); p.fill('#w-desc', 'Cracked basin, leaking'); p.screenshot(path=OUT + 'sv2-details.png', full_page=True)
     submit(); p.fill('#w-nop', 'Will show the Pro on site'); submit()
     p.fill('#w-date', D1); p.fill('#w-sn', 'Inventory and deep clean before move-in'); submit(); p.screenshot(path=OUT + 'sv3-review.png', full_page=True)
-    check('Submit 4 requests' in p.locator('form[data-form=wiz] button[type=submit]').inner_text(), 'review offers to submit 4 requests')
+    check('Book 4 services' in p.locator('form[data-form=wiz] button[type=submit]').inner_text(), 'review offers to book 4 services')
     submit(); W(600)
     jobs = p.evaluate("() => Object.values(D.jobs).sort((a,b)=>a.ref.localeCompare(b.ref)).map(j => [svcKey(j), j.groupId, Object.keys(j.scope).sort().join(',')])")
     check(len(jobs) == 4 and len(set(j[1] for j in jobs)) == 1 and jobs[0][1], 'four linked requests share one booking: ' + str([j[0] for j in jobs]))
@@ -44,11 +44,12 @@ with sync_playwright() as pw:
     # rules
     r = p.evaluate("""() => {
       var inv = Object.values(D.jobs).find(j => j.type === 'INVENTORY'), mt = Object.values(D.jobs).find(j => j.type === 'MID_TERM');
-      var pro = { id: 'pz', status: 'APPROVED', skills: ['INVENTORY', 'MID_TERM'], coverage: ['BA'], level: 3, docs: [] };
-      var a = String(eligible(pro, inv, null)); pro.level = 4; var b = eligible(pro, inv, null); pro.skills = ['CHECK_IN']; var c = String(eligible(pro, mt, null));
-      return [requiredLevel(inv), requiredLevel(mt), a, b, c, guideLines(inv)[0].d, isInspK('MID_TERM'), comparesK('MID_TERM'), signoffK('CHECK_IN'), signoffK('MID_TERM')]; }""")
-    check(r[0] == 4 and r[1] == 4, 'inspections need Level 4')
-    check('Needs Level 4' in r[2] and r[3] is True and 'Missing' in r[4], 'eligibility checks level and the new skills')
+      var pro = { id: 'pz', status: 'APPROVED', skills: ['INVENTORY', 'MID_TERM'], coverage: ['BA'], levels: { CLERK: 1 }, docs: [] };
+      var big = Object.assign({}, inv, { propSnapshot: Object.assign({}, inv.propSnapshot, { bedrooms: 5 }) });
+      var a = String(eligible(pro, big, null)); pro.levels.CLERK = 3; var b = eligible(pro, big, null); pro.skills = ['CHECK_IN']; var c = String(eligible(pro, mt, null));
+      return [requiredLevel(inv), requiredLevel(big), a, b, c, guideLines(inv)[0].d, isInspK('MID_TERM'), comparesK('MID_TERM'), signoffK('CHECK_IN'), signoffK('MID_TERM')]; }""")
+    check(r[0] == 1 and r[1] == 3, 'inspections need a Pro Clerk level by property size')
+    check('Needs Pro Clerk · Level 3' in r[2] and r[3] is True and 'Missing' in r[4], 'eligibility checks role level and the new skills')
     check(r[5].startswith('Inventory & Condition · 2 bedrooms'), 'rate card line for inventory: ' + r[5])
     check(r[6:] == [True, True, True, False], 'mid-term compares with baseline; check-in and check-out have sign-off')
     # baseline: released inventory becomes the check-out / mid-term baseline

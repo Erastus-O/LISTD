@@ -64,9 +64,9 @@ with sync_playwright() as pw:
         for d in range(7): p.check('input[name=days][value="%d"]'%d)
         for s in ['morning','afternoon','evening']: p.check('input[name=slots][value=%s]'%s)
         btn('Save & continue')
-        for i in range(4): p.locator('input[data-up]').nth(i).set_input_files(IMG); W(500)
+        for i in range(p.locator('input[data-up]').count()): p.locator('input[data-up]').nth(i).set_input_files(IMG); W(500)
         shot(p,'08-pro-docs'); btn('Continue'); p.fill('#pr-l4','1234'); btn('Save & continue'); shot(p,'09-pro-submit'); p.check('#pob-terms'); btn('Submit for review'); log('pro submitted')
-        role('admin'); nav('pros'); shot(p,'10-admin-pros'); p.locator('.a-main tr.click').first.click(); W(); shot(p,'10b-admin-pro'); p.select_option('form[data-form=pro-review] select[name=level]','4'); p.locator('form[data-form=pro-review] button[value=APPROVED]').first.click(); W(); log('pro approved at level '+str(p.evaluate("() => proLevel(Object.values(D.pros)[0])")))
+        role('admin'); nav('pros'); shot(p,'10-admin-pros'); p.locator('.a-main tr.click').first.click(); W(); shot(p,'10b-admin-pro'); [p.select_option('form[data-form=pro-review] select[name=%s]' % n, '3') for n in p.eval_on_selector_all('form[data-form=pro-review] select[name^=level_]', 'els => els.map(e => e.name)')]; p.locator('form[data-form=pro-review] button[value=APPROVED]').first.click(); W(); log('pro approved at level '+str(p.evaluate("() => proLevel(Object.values(D.pros)[0])")))
         openref('LJ-1001'); p.select_option('#of-pro', index=1); p.fill('#of-date',D1); shot(p,'11-offer'); btn('Send offer'); log('offered')
         role('pro'); nav('offers'); p.locator('.a-main .a-job').first.click(); W(); shot(p,'12-pro-offer'); btn('Accept job'); log('accepted '+str(state('LJ-1001')))
         up('input[data-up*="clock-in"]'); btn('Clock in'); log('clocked in '+str(state('LJ-1001')))
@@ -96,6 +96,8 @@ with sync_playwright() as pw:
         while p.locator('[data-act=vet]').count() and cnt<200:
             p.locator('[data-act=vet]').first.click(); p.wait_for_timeout(60); cnt+=1
         log('vetted %d'%cnt); W(900); shot(p,'31-vetted')
+        # every item needs a condition rating; rate the ones the AI didn't
+        p.evaluate("() => { var j=Object.values(D.jobs).find(x=>x.ref==='LJ-1001'); var d=draftOf(j); d.rooms.forEach(function(rm){ rm.items.forEach(function(it){ if(!it.cond) it.cond='good'; }); }); saveDraft(j.id); render(); }"); W()
         p.fill('#so-name', 'Jo Tenant'); W(900); p.select_option('#so-st', 'signed'); W(); shot(p, '19a-signoff'); btn('Submit report'); log('insp submitted '+str(state('LJ-1001')) + ' toast: ' + p.locator('#toast').inner_text())
         role('admin'); openref('LJ-1001'); btn('Release to client')
         role('client'); openref('LJ-1001'); shot(p,'32-client-insp')

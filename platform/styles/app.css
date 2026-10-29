@@ -571,3 +571,9 @@ select.a-mini[data-staffrole] { min-width: 150px; }
 .a-feeparts td{padding:5px 0;border-bottom:1px solid var(--border);vertical-align:top}
 .a-feeparts td.r{text-align:right;white-space:nowrap;padding-left:12px;font-variant-numeric:tabular-nums}
 .a-feeparts tr.tot td{font-weight:700;border-bottom:0}
+/* Pro roles: one level badge per role, and services grouped by role in onboarding */
+.a-rolebar { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.a-rolegrp { display: grid; gap: 6px; padding: 10px 0; border-top: 1px solid var(--border); }
+.a-rolegrp:first-of-type { border-top: 0; padding-top: 0; }
+.a-pdlevel + .a-pdlevel { border-top: 1px solid var(--border); padding-top: 16px; margin-top: 16px; }
+.ld-rail b small { display: block; font-weight: 500; color: var(--text-muted); }

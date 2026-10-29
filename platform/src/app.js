@@ -33,7 +33,7 @@ function badgeFor(v) {
 }
 function whoBlock() {
   if (S.role === 'client') { var c = me(); return '<div class="who"><b>' + esc(c.orgName || c.name) + '</b><span>' + esc(SEGMENTS[c.segment].label) + '</span></div>'; }
-  if (S.role === 'pro') { var p = meP(), st = proStats(p.id); return '<div class="who"><b>' + esc(p.name) + '</b><span>Level ' + st.level + ' · ' + esc(st.levelName) + '</span></div>'; }
+  if (S.role === 'pro') { var p = meP(), st = proStats(p.id); return '<div class="who"><b>' + esc(p.name) + '</b><span>' + esc(st.levelName) + '</span></div>'; }
   return '<div class="who"><b>LISTD operations</b><span>' + esc((STAFF_ROLES[staffRole()] || { label: 'Admin' }).label) + '</span></div>';
 }
 /* notifications slide-in panel (opened from the bell, top right) */
@@ -199,7 +199,7 @@ document.addEventListener('click', function (e) {
     case 'ob-back': patchDoc('clients', S.clientId, { onboarding: { status: 'IN_PROGRESS', step: Math.max(1, me().onboarding.step - 1) } }); break;
     case 'cl-ob-finish': patchDoc('clients', S.clientId, { onboarding: { status: 'DONE', step: 5, doneAt: now() } }); S.view = 'home'; toast('You’re all set'); break;
     case 'pob-back': patchDoc('pros', S.proId, { onboarding: { status: 'IN_PROGRESS', step: Math.max(2, meP().onboarding.step - 1) } }); break;
-    case 'pob-docs': var p = meP(), req = DOCS.filter(function (d) { return d[2] || (d[0] === 'INSURANCE' && (p.skills || []).indexOf('REPAIRS_DAMAGES') >= 0); }), missing = req.filter(function (d) { return !(p.docs || []).some(function (x) { return x.type === d[0]; }); }); if (missing.length) { toast('Upload: ' + missing.map(function (d) { return d[1]; }).join(', ')); return; } patchDoc('pros', S.proId, { onboarding: { status: 'IN_PROGRESS', step: 6 } }); break;
+    case 'pob-docs': var p = meP(), missing = docsMissing(p); if (missing.length) { toast('Upload: ' + missing.map(function (d) { return d[1]; }).join(', ')); return; } patchDoc('pros', S.proId, { onboarding: { status: 'IN_PROGRESS', step: 6 } }); break;
     case 'pob-submit': var tc = document.getElementById('pob-terms'); if (!tc || !tc.checked) { toast('Agree to the Pro terms to submit.'); if (tc) tc.focus(); return; } patchDoc('pros', S.proId, { consent: Object.assign({}, meP().consent, { terms: now() }), onboarding: { status: 'SUBMITTED', step: 7, submittedAt: now() }, status: 'PENDING' }); if (!pendingApp(S.proId, 'JOIN')) setDoc('applications', uid(), { proId: S.proId, kind: 'JOIN', from: 0, to: 1, status: 'PENDING', createdAt: now() }); notify('admin', 'Pro application from ' + meP().name + ' to review'); S.view = 'home'; toast('Application submitted'); break;
     case 'pob-edit': patchDoc('pros', S.proId, { onboarding: { status: 'IN_PROGRESS', step: 2 } }); break;
     /* properties & wizard */
@@ -236,6 +236,7 @@ document.addEventListener('click', function (e) {
     case 'rv': S.params = Object.assign({}, S.params, { rv: +a.dataset.v }); render(); break;
     /* pro */
     case 'offer-yes': if (cmdOfferReply(j, true)) toast('Job accepted and scheduled'); break;
+    case 'take-open': if (cmdTakeOpenJob(j)) toast('Job accepted and scheduled'); break;
     case 'offer-no': M('offer-no'); break;
     case 'clock-in': if (cmdClockIn(j, (S.clockPhoto || {})[id])) { delete S.clockPhoto[id]; toast('Clocked in'); } break;
     case 'cond': var d = draftOf(j), it = d.rooms[+a.dataset.r].items[+a.dataset.i]; it.cond = it.cond === a.dataset.c ? '' : a.dataset.c; saveDraft(id); render(); break;
@@ -285,7 +286,7 @@ document.addEventListener('change', async function (e) {
   if (el.dataset.staffrole) { if (el.value) { var sid = el.dataset.staffrole, srole = el.value; el.value = (D.staff[sid] || {}).role || ''; keyDecision('staff-role', { id: sid, role: srole }); } return; }
   if (el.id === 'inv-c') { S.modal.cid = el.value; S.modal.jid = ''; S.modal.pid = ''; render(); return; }
   if (el.id === 'inv-j') { S.modal.jid = el.value; render(); invCalc(document.querySelector('form[data-form=inv-create]')); return; }
-  if (el.id === 'of-pro') { var fe = document.getElementById('of-fee'), pr0 = D.pros[el.value], jq = fe && D.jobs[fe.dataset.job], aq0 = jq && acceptedQuote(jq); if (fe && pr0 && aq0 && aq0.proBase) fe.value = (feeFromBase(aq0.proBase, proLevel(pr0)) / 100).toFixed(2); return; }
+  if (el.id === 'of-pro') { var fe = document.getElementById('of-fee'), pr0 = D.pros[el.value], jq = fe && D.jobs[fe.dataset.job], aq0 = jq && acceptedQuote(jq); if (fe && pr0 && aq0 && aq0.proBase) fe.value = (feeFromBase(aq0.proBase, proLevel(pr0, baseRole(aq0.proBase))) / 100).toFixed(2); return; }
   if (el.dataset.wizclean && S.wiz) { S.wiz.scope.clean = el.value; S.wiz.scope.addons = (S.wiz.scope.addons || []).filter(function (a) { return cleanIncl(el.value).indexOf(a) < 0; }); render(); return; }
   if (S.wiz && ['w-bed', 'w-rec', 'w-frn', 'w-unf'].indexOf(el.id) >= 0) { var g = function (id) { var e = document.getElementById(id); return e ? Math.max(0, +e.value || 0) : 0; }, tot = g('w-bed') + 1 + g('w-rec'), fe = document.getElementById('w-frn'), ue = document.getElementById('w-unf'); if (fe && ue) { if (el.id === 'w-unf') fe.value = Math.max(0, tot - g('w-unf')); else ue.value = Math.max(0, tot - Math.min(tot, g('w-frn'))); if (el.id !== 'w-unf' && g('w-frn') > tot) fe.value = tot; var nt = document.getElementById('w-furn-note'); if (nt) nt.textContent = 'Count the bedrooms, living room and reception rooms: ' + tot + ' in total. ' + FURNISH[furnLevel(g('w-frn'), tot)] + '.'; } return; }
   if (el.dataset.wizprop && S.wiz) { S.wiz.propertyId = el.value; S.wiz.rooms = null; render(); return; }
@@ -396,16 +397,18 @@ document.addEventListener('submit', function (e) {
     case 'resolve': if (!staffGuard('disputes', 'resolve disputes')) return; cmdResolveDispute(j, v('outcome'), v('reason'), toP(v('refund')), toP(v('feeAdj'))) && toast('Dispute resolved'); break;
     case 'co-issue': cmdIssueCO(j, f.dataset.co, toP(v('total')), toP(v('fee'))) && toast('Sent to client'); break;
     case 'pro-review': if (!staffGuard('pros', 'review Pros')) return;
-      var dec = e.submitter ? e.submitter.value : '', r = v('reason'), pr = D.pros[id], lv = Math.min(5, Math.max(1, +v('level') || proLevel(pr)));
+      var dec = e.submitter ? e.submitter.value : '', r = v('reason'), pr = D.pros[id], lvs = {}; proRoles(pr).forEach(function (ro) { lvs[ro] = Math.min(3, Math.max(1, +v('level_' + ro) || proLevel(pr, ro))); });
       if (dec !== 'APPROVED' && !r) { toast('Give a reason so the Pro knows what to do.'); return; }
-      if (dec === 'APPROVED' && pr.status === 'PENDING') { var gt = trainingGate(pr, lv); if (gt !== true) { toast(gt); return; } }
+      if (dec === 'APPROVED' && pr.status === 'PENDING') { var gt = true; Object.keys(lvs).forEach(function (ro) { var g1 = trainingGate(pr, ro, lvs[ro]); if (gt === true && g1 !== true) gt = g1; }); if (gt !== true) { toast(gt); return; } }
       var part = { status: dec, review: { decision: dec, reason: r, at: now() } }; if (dec === 'RESUBMIT' || dec === 'REJECTED') part.onboarding = Object.assign({}, pr.onboarding, { status: 'SUBMITTED' });
-      if (dec === 'APPROVED' && pr.status === 'PENDING') { part.level = lv; part.levelOverride = null; part.levelHistory = (pr.levelHistory || []).concat([{ from: 0, to: lv, reason: 'Starting level on approval' + (r ? ': ' + r : ''), at: now() }]); }
-      var ja = pendingApp(id, 'JOIN'); if (ja && pr.status === 'PENDING' && dec !== 'SUSPENDED') patchDoc('applications', ja.id, { status: dec === 'APPROVED' ? 'APPROVED' : dec === 'RESUBMIT' ? 'CHANGES' : 'REJECTED', decision: { by: ENV.uid || 'admin', reason: r || (dec === 'APPROVED' ? 'Approved at Level ' + lv : ''), at: now() } });
-      patchDoc('pros', id, part); audit('pro.review', 'pro', id, r || 'Approved', { decision: dec, level: part.level }); notify('p:' + id, dec === 'APPROVED' ? (pr.status === 'SUSPENDED' ? 'Your account has been reinstated.' : 'You’re approved at Level ' + lv + ' (' + LEVEL_INFO[lv].name + '). Offers will appear on your dashboard.') : dec === 'SUSPENDED' ? 'Your account has been suspended.' : 'Your application needs attention: ' + r); toast('Saved'); break;
-    case 'set-level': cmdSetLevel(id, +v('level'), v('reason')) && (toast('Level updated'), f.reset()); break;
+      var lvText = Object.keys(lvs).map(function (ro) { return roleBadge(ro, lvs[ro]); }).join(', ');
+      if (dec === 'APPROVED' && pr.status === 'PENDING') { part.levels = lvs; part.levelHistory = (pr.levelHistory || []).concat(Object.keys(lvs).map(function (ro) { return { role: ro, from: 0, to: lvs[ro], reason: 'Starting level on approval' + (r ? ': ' + r : ''), at: now() }; })); }
+      var ja = pendingApp(id, 'JOIN'); if (ja && pr.status === 'PENDING' && dec !== 'SUSPENDED') patchDoc('applications', ja.id, { status: dec === 'APPROVED' ? 'APPROVED' : dec === 'RESUBMIT' ? 'CHANGES' : 'REJECTED', decision: { by: ENV.uid || 'admin', reason: r || (dec === 'APPROVED' ? 'Approved as ' + lvText : ''), at: now() } });
+      patchDoc('pros', id, part); audit('pro.review', 'pro', id, r || 'Approved', { decision: dec, levels: part.levels }); notify('p:' + id, dec === 'APPROVED' ? (pr.status === 'SUSPENDED' ? 'Your account has been reinstated.' : 'You’re approved as ' + lvText + '. Open jobs near you and offers from LISTD will appear on your dashboard.') : dec === 'SUSPENDED' ? 'Your account has been suspended.' : 'Your application needs attention: ' + r); toast('Saved'); break;
+    case 'set-level': cmdSetLevel(id, v('role'), +v('level'), v('reason')) && (toast('Level updated'), f.reset()); break;
+    case 'std-pass': cmdPassStandards(id, v('role'), v('reason')) && (toast('Standards check marked as passed'), f.reset()); break;
     case 'app-decide': cmdDecideApp(id, (e.submitter && e.submitter.value) === 'APPROVE', v('reason')) && toast('Decision saved'); break;
-    case 'apply-level': cmdApplyLevel(v('note')) && toast('Application sent to LISTD'); break;
+    case 'apply-level': cmdApplyLevel(v('role'), v('note')) && toast('Application sent to LISTD'); break;
     case 'training-done': if (!fd.get('confirm')) { toast('Confirm you’ve finished the training.'); return; } cmdCompleteTraining(id) && toast('Training completed'); break;
     case 'staff-invite': if (!v('name') || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v('email'))) { toast('Enter their name and a valid work email.'); return; } keyDecision('staff-invite', { name: v('name'), email: v('email'), role: v('role') }); break;
     case 'staff-transfer': if (!fd.get('confirm')) { toast('Tick the box to confirm.'); return; } keyDecision('staff-transfer', { id: S.modal.id }); break;
@@ -417,7 +420,7 @@ document.addEventListener('submit', function (e) {
     case 'price-phone': var np = normPhone(v('phone')); if (!np) { toast('Enter a UK mobile number, or an international number starting with +.'); return; } if (pricePhone() && np === pricePhone()) { toast('That’s already the phone for price changes.'); return; } sendPriceCode(pricePhone() ? 'phone-old' : 'phone', pricePhone() || np, { newPhone: np }); break;
     case 'price-code': verifyPriceCode(v('code')).then(function (x) { if (x) priceCodeDone(x); else render(); }); break;
     case 'policies': if (!staffGuard('policies', 'change policies')) return; if (!isMainAdmin()) { toast('Only the Main admin can change catalogue & policies.'); return; }
-      var ns = { company: { name: v('coName') || 'LISTD Inventory', address: v('coAddr'), phone: v('coPhone'), email: v('coEmail') }, quoteValidityDays: Math.max(1, +v('quoteValidityDays') || 7), offerValidityHours: Math.max(1, +v('offerValidityHours') || 12), reviewHours: Math.max(1, +v('reviewHours') || 48), rescheduleHours: Math.max(0, +v('rescheduleHours') || 24), repairCategories: v('repairCategories').split(',').map(function (x) { return x.trim(); }).filter(Boolean), levels: [1, 2, 3, 4, 5].map(function (k) { var r = lvRule(k); return { minJobs: fd.has('lv_' + k + '_jobs') ? Math.max(0, Math.round(+v('lv_' + k + '_jobs') || 0)) : r.minJobs, minRating: fd.has('lv_' + k + '_rating') ? Math.min(5, Math.max(0, +v('lv_' + k + '_rating') || 0)) : r.minRating }; }) };
+      var ns = { company: { name: v('coName') || 'LISTD Inventory', address: v('coAddr'), phone: v('coPhone'), email: v('coEmail') }, quoteValidityDays: Math.max(1, +v('quoteValidityDays') || 7), offerValidityHours: Math.max(1, +v('offerValidityHours') || 12), reviewHours: Math.max(1, +v('reviewHours') || 48), rescheduleHours: Math.max(0, +v('rescheduleHours') || 24), repairCategories: v('repairCategories').split(',').map(function (x) { return x.trim(); }).filter(Boolean), roleLevels: [1, 2, 3].map(function (k) { var r = lvRule(k); return { minJobs: fd.has('lv_' + k + '_jobs') ? Math.max(0, Math.round(+v('lv_' + k + '_jobs') || 0)) : r.minJobs, minRating: fd.has('lv_' + k + '_rating') ? Math.min(5, Math.max(0, +v('lv_' + k + '_rating') || 0)) : r.minRating }; }), standardsJobs: fd.has('standardsJobs') ? Math.max(0, Math.round(+v('standardsJobs') || 0)) : standardsJobs() };
       keyDecision('policies', { ns: ns, reason: v('reason') }); break;
   }
 });

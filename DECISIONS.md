@@ -53,7 +53,7 @@
 - Vetting: every AI draft is marked as awaiting the Pro's check, and the report can't be submitted until the Pro confirms each one (they can edit first). Items in the report are labelled "AI-assisted, clerk-checked", and the PDF declaration page notes that AI was used.
 - If AI isn't available, the Pro writes the descriptions manually. Each viewer is asked once to allow photos to be sent to Claude, and AI use counts toward their own Claude usage.
 
-## Pro levels, training and applications (added 22 Oct 2026, user instruction)
+## Pro levels, training and applications (added 22 Oct 2026; superseded on 29 Oct 2026 by Pro roles, see “Platform amendments” below)
 - **Five levels.** Levels 1–3 are cleaning: L1 Light cleans, L2 Light and General cleans, L3 all cleans. Levels 4–5 add inspections and a higher pay share: L4 check-in/out up to 3 bedrooms, L5 any size. Offers check the level, both when they are sent and when they are accepted.
 - **Moving up.** A Pro applies for the next level when they meet its rules: they hold the previous level, have enough completed jobs, have a high enough average rating and are approved. An Admin then approves or declines with a reason. Admins can also set a level directly, with a reason; this is audited.
 - **Training gate.** Levels 4 and 5 need every published training marked for that level or below. Neither an Admin approval nor a direct level change can get round this. Archiving a training later doesn't remove a level already held.
@@ -198,3 +198,35 @@ Clients no longer choose Standard or Priority. Any date within two working days 
 - Once a quote is issued, Admin sees "Quote vN sent to client" (sent time, client total, expiry, and whether it is waiting for the client, accepted awaiting payment, or expired) instead of an open editor. The status pill reads "Quote sent" (or "Invoice sent") for admins; clients still see "Quote ready".
 - "Update quote" opens the editor as vN+1 and needs a reason, which is shown to the client. Sending it supersedes the previous version (even an accepted one) and the client accepts the new version. Cancel discards the edits.
 - After payment there is no Update quote; extra work goes through a change order.
+
+## Platform amendments (Overview & decisions, 28 Oct 2026; built 29 Oct 2026)
+Source: “LISTD platform amendments · Overview & decisions” (the overview tab only; the per-page wording tabs, the Developer list and the four open questions were not supplied).
+
+| Topic | Decision | Where it's built |
+|---|---|---|
+| Payment wording | Never “escrow”. Payment is secured when the client books and released to the Pro when the client approves the finished job. | Website copy, client wizard, sign-in panel |
+| Who approves | Clients approve the finished job; “approve the report” only on inspection-only lines. | Website, job page, notifications (“ready to approve”) |
+| How jobs reach Pros | Mixed: Pros accept open jobs in their area, and LISTD can send a job straight to a chosen Pro. | Pro › Jobs (“Open jobs near you” and “Sent to you by LISTD”); Admin “Send straight to a Pro” |
+| Job stages (client-facing) | Booked → Accepted → In progress → LISTD review → Ready to approve → Approved; “Finding a Pro” under Booked. A Quote step comes before Booked. | `STATUS`, `statusPill`, job progress rail |
+| Services | Repairs & Maintenance (was Repairs & Damages). “More services coming soon” in the Services menu, service cards and footer. | `SVC`, `KINDS`, website, booking wizard |
+| Priority | Within two working days, when a Pro is available, +£30. Changes when the job happens, never how well it’s done. | Website, `SCHED.priority` |
+| Report detail | Every report rates every item; close-ups and scale references on any damage, whatever the scheduling option. | Inspection editor (rating required per item), website |
+| Condition scale | New, Excellent/Very good, Good, Fair, Poor, Very poor, plus Not applicable. | `COND`; report view, PDF and AI drafts |
+| Pro roles | Pro Clerk (inspections), Pro Cleaner (cleaning), Pro Trades (repairs). More than one allowed. | `ROLES`, onboarding, Pro and Admin screens |
+| Pro levels | 3 levels in every role, unlocked by completed jobs and ratings. Badge “Pro Clerk · Level 3”. Hourly rate per role and level set by LISTD. | `levels.js`, `pricing().pro.rates` |
+| Standards check | First 5 jobs in each role get closer review; badge “New to LISTD”; experienced Pros can move up faster once passed. | `standardsCheck`, Admin review banner, “Pass the standards check early” |
+| Insurance and checks | All: photo ID, right to work, basic DBS, public liability. Clerks also professional indemnity. Trades also legally required trade certificates. | `DOCS`, `docNeeded` |
+| Pricing | Bristol and Birmingham share prices; London later. Extra rooms each a visible line. | `pricing().area`, one quote line per extra room |
+| Coverage | Bristol and the South West: every service. Birmingham: cleaning now, inspections and repairs coming soon. | `COVERAGE`, `coverageBlock` (booking refused with a clear message), website |
+| Prices vs quotes | “Quote” before work, “Receipt” for money paid; clients never see “invoice” except the VAT invoice download. | Client nav: Quotes, Receipts; VAT invoice download on Receipts |
+| Booking word | “Book” and “Bookings”, never “Request” (except “Report a repair”). | Client and Admin screens |
+| Payouts | Paid weekly once the client approves the finished job (confirm before launch). | Pro Earnings, website |
+| Contact | support@listd.co.uk; no phone until the LISTD number is confirmed; Instagram @listd_pro, TikTok listdpro, Facebook Listd.Pro. | Website contact and footer; report cover (phone removed) |
+| TechSPARK | “Supported by” / “Part of the Tech Adoption for Growth programme”, never “Backed by”. | Website |
+
+**Placeholders to confirm** (chosen so the product works end to end; all editable):
+- Clerk level limits: Level 1 up to 2 bedrooms, Level 2 up to 4, Level 3 any size. Cleaner: Level 1 Standard; Level 2 adds End of Tenancy and Office; Level 3 adds Deep. Trades levels change the rate only.
+- Level rules: Level 2 at 10 jobs and a 4.5 rating, Level 3 at 30 jobs and 4.7, counted within the role; the standards check must be passed before Level 2.
+- Hourly rates (per hour, Level 1/2/3): Clerk £18/£20/£22, Cleaner £14/£15/£16, Trades £20/£23/£26.
+- South West postcode areas: BS, BA, GL, SN, TA, EX, TQ, PL, TR, DT, BH, SP. Birmingham: B.
+- Existing Pros keep their work: old Levels 1–3 become Pro Cleaner Levels 1–3; old Level 4 becomes Pro Clerk Level 2 and Level 5 becomes Pro Clerk Level 3.
