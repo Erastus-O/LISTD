@@ -1,0 +1,126 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "regions": [
+    "lhr1"
+  ],
+  "functions": {
+    "src/app/api/notifications/review-request/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/notifications/job-published/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/notifications/pre-inspection-ack/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/notifications/tenant-checkin/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/integrations/inventorybase/sync/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/admin/users/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/jobs/new/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/jobs/published/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/xero/callback/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/xero/invoices/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/xero/payments/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/xero/contacts/sync/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/cron/recycle-jobs/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/cron/upsell-reminders/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/cron/clerk-doc-expiry/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/cron/xero-invoice-reconciliation/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/cron/inventorybase-drift/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/cron/mark-overdue/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/webhooks/stripe/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/billing/invoices/[id]/payment-link/route.ts": {
+      "maxDuration": 15
+    },
+    "src/app/api/admin/invoices/export/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/cron/issue-recurring/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/cron/appointment-reminders/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/cron/appointment-reminders-soon/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/admin/clerks/[clerkId]/verification/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/admin/impersonation/start/route.ts": {
+      "maxDuration": 15
+    },
+    "src/app/api/admin/impersonation/end/route.ts": {
+      "maxDuration": 10
+    },
+    "src/app/api/webhooks/resend/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/webhooks/make/[event]/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/webhooks/inventorybase/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/webhooks/twilio/route.ts": {
+      "maxDuration": 15
+    },
+    "src/app/api/admin/email-logs/export/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/tenant/sign/route.ts": {
+      "maxDuration": 15
+    },
+    "src/app/api/jobs/create/route.ts": {
+      "maxDuration": 15
+    },
+    "src/app/api/properties/route.ts": {
+      "maxDuration": 15
+    },
+    "src/app/api/cron/export-logs/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/cron/data-retention/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/cron/monthly-promo-billing/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/cron/missed-checkin/route.ts": {
+      "maxDuration": 60
+    }
+  }
+}

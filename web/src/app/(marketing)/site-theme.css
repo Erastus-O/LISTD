@@ -1,0 +1,130 @@
+/* Website surface: the app's cream ground (app.css) doesn't apply here. */
+@import "../../styles/listd/site.css";
+
+:root {
+  --bg: var(--neutral-50);
+}
+
+/* The prototype CSS was written for the browser default box model; Tailwind's
+ * preflight switches everything to border-box, which shrinks these panels. */
+@layer components {
+  .s-panel,
+  .s-panel-card {
+    box-sizing: content-box;
+  }
+}
+
+/* The client reference uses the dark LISTD palette. Scope it to the home
+ * route marker so client navigation restores the other pages' own theme. */
+:root:has(.s-home) {
+  --bg:var(--neutral-950);
+  --surface:var(--neutral-900);
+  --surface-raised:var(--neutral-850);
+  --surface-sunken:var(--neutral-950);
+  --surface-inverse:var(--neutral-50);
+  --border:var(--neutral-700);
+  --border-strong:var(--neutral-400);
+  --text:var(--neutral-50);
+  --text-muted:var(--neutral-300);
+  --text-subtle:var(--neutral-400);
+  --text-inverse:var(--neutral-900);
+  --brand:var(--teal-400);
+  --brand-hover:var(--teal-300);
+  --brand-pressed:var(--teal-200);
+  --brand-subtle:var(--teal-950);
+  --brand-text:var(--teal-300);
+  --on-brand:var(--neutral-950);
+  --focus-ring:var(--sky-500);
+  --success:var(--mint-500);
+  --success-subtle:var(--mint-900);
+  --warning:var(--amber-500);
+  --warning-subtle:var(--amber-900);
+  --danger:var(--coral-500);
+  --danger-subtle:var(--coral-900);
+  --info:var(--sky-500);
+  --info-subtle:var(--sky-900);
+  --service-inventory-subtle:var(--mint-900);
+  --service-inventory-text:var(--mint-300);
+  --service-checkin-subtle:var(--sky-900);
+  --service-checkin-text:var(--sky-300);
+  --service-checkout-subtle:var(--coral-900);
+  --service-checkout-text:var(--coral-300);
+  --service-midterm-subtle:var(--violet-900);
+  --service-midterm-text:var(--violet-300);
+  --service-cleaning-subtle:var(--pink-900);
+  --service-cleaning-text:var(--pink-300);
+  --service-repairs-subtle:var(--amber-900);
+  --service-repairs-text:var(--amber-300);
+  --overlay:#000000;
+  --shadow-xs:0 1px 2px rgba(0,0,0,0.4);
+  --shadow-sm:0 2px 6px rgba(0,0,0,0.45);
+  --shadow-md:0 10px 24px -8px rgba(0,0,0,0.6);
+  --shadow-lg:0 24px 56px -16px rgba(0,0,0,0.7);
+  color-scheme:dark;
+  --hero-a: var(--teal-950);
+  --hero-b: var(--sky-900);
+  --hero-c: var(--mint-900);
+  --band: var(--neutral-850);
+  --band-text: var(--neutral-50);
+  --band-muted: var(--neutral-300);
+}
+
+.s-home .s-hero .s-h1 {
+  max-width: 1120px;
+  font-size: clamp(40px, 5.6vw, 72px);
+}
+
+.s-home .s-hero .s-h1 em {
+  color: var(--mint-500);
+  text-decoration: underline;
+  text-decoration-thickness: 5px;
+  text-underline-offset: 8px;
+}
+
+/* Keep the product preview within the content width under Tailwind preflight. */
+.s-home :is(.s-panel, .s-panel-card) {
+  box-sizing: border-box;
+}
+
+.s-home .s-panel {
+  width: calc(100% + 80px);
+  max-width: min(1200px, calc(100vw - 32px));
+}
+
+.s-home .s-panel-card {
+  max-width: 984px;
+}
+
+.s-home .s-hero .s-lead {
+  max-width: 60ch;
+}
+
+.s-home .s-hero .s-h1 em::after {
+  content: none;
+}
+
+.s-home .s-visual.warm {
+  background: linear-gradient(150deg, var(--amber-900), var(--hero-a) 70%);
+}
+
+.s-home .s-service-chips p {
+  min-width: 0;
+}
+
+.s-home .s-service-chips .ld-badge {
+  max-width: 100%;
+  height: auto;
+  min-height: 24px;
+  white-space: normal;
+}
+
+@media (max-width: 639px) {
+  .s-home .s-hero .s-h1 {
+    font-size: clamp(32px, 7.6vw, 48px);
+  }
+
+  .s-home .s-hero .s-h1 em {
+    text-decoration-thickness: 3px;
+    text-underline-offset: 5px;
+  }
+}

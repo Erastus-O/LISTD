@@ -1,0 +1,60 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# ── Dependencies ────────────────────────────────────────────────────
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# ── Next.js build output ────────────────────────────────────────────
+/.next/
+/out/
+/build
+/dist
+.turbo/
+
+# ── Testing ─────────────────────────────────────────────────────────
+/coverage
+*.lcov
+
+# ── Environment ─────────────────────────────────────────────────────
+# Ignore every .env variant EXCEPT the committed template. Guards against
+# accidentally committing .env, .env.local, .env.production, etc. Real
+# secrets live in .env.local (gitignored); .env.example is the
+# placeholder-only template that IS tracked.
+.env
+.env.*
+!.env.example
+
+# ── TypeScript ──────────────────────────────────────────────────────
+*.tsbuildinfo
+next-env.d.ts
+
+# ── Vercel ──────────────────────────────────────────────────────────
+.vercel
+
+# ── Logs ────────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ── OS / editor cruft ───────────────────────────────────────────────
+.DS_Store
+*.pem
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.idea/
+*.swp
+*.swo
+*~
+
+# The repo root ignores public/ (prototype build output). This app's public/ is source.
+!public/

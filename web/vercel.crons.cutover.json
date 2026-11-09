@@ -1,0 +1,65 @@
+{
+  "_note": "Cron schedules moved out of vercel.json. This app shares its database with the live ListdPro deployment, so running them from both would double-send reminders and double-process jobs. Copy this array back into vercel.json only at cutover, when the old deployment's crons are removed.",
+  "crons": [
+    {
+      "path": "/api/cron/recycle-jobs",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/upsell-reminders",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/clerk-doc-expiry",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/xero-invoice-reconciliation",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/inventorybase-drift",
+      "schedule": "5 * * * *"
+    },
+    {
+      "path": "/api/cron/mark-overdue",
+      "schedule": "30 6 * * *"
+    },
+    {
+      "path": "/api/cron/issue-recurring",
+      "schedule": "15 7 * * *"
+    },
+    {
+      "path": "/api/cron/appointment-reminders",
+      "schedule": "0 17 * * *"
+    },
+    {
+      "path": "/api/cron/appointment-reminders-soon",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/export-logs",
+      "schedule": "10 0 * * *"
+    },
+    {
+      "path": "/api/cron/data-retention",
+      "schedule": "30 2 * * *"
+    },
+    {
+      "path": "/api/cron/monthly-promo-billing",
+      "schedule": "45 7 * * *"
+    },
+    {
+      "path": "/api/cron/missed-checkin",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/auto-approve",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/weekly-payouts",
+      "schedule": "0 9 * * 1"
+    }
+  ]
+}

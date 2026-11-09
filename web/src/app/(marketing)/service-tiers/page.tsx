@@ -1,0 +1,21 @@
+import type { Metadata } from 'next'
+import { SeoJsonLd } from '@/components/seo/seo-json-ld'
+import { CtaBand } from '@/components/site/views/cta-band'
+import { PricingView } from '@/components/site/views/pricing'
+import { buildMarketingMetadata } from '@/lib/seo-meta'
+
+// Meta is CMS-editable: code defaults live in lib/seo-meta.ts and admin
+// overrides (set on /admin/seo) are layered on top at request time.
+export function generateMetadata(): Promise<Metadata> {
+  return buildMarketingMetadata('/service-tiers')
+}
+
+export default function PricingPage() {
+  return (
+    <>
+      <SeoJsonLd path="/service-tiers" />
+      <PricingView />
+      <CtaBand />
+    </>
+  )
+}

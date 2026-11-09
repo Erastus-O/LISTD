@@ -1,0 +1,154 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+/* LISTD design system (ported from the prototype: design-system/, platform/styles/).
+ * tokens.css is plain variables; components.css and app.css sit in @layer components
+ * so Tailwind utilities on individual screens still win over their element rules. */
+@import "../styles/listd/tokens.css";
+@import "../styles/listd/components.css";
+@import "../styles/listd/app.css";
+
+/* Be explicit about content scanning. Tailwind v4 auto-detects most paths,
+ * but spelling out src/ prevents the dev CSS going stale when new files
+ * land during a long-running dev session. Path is relative to this file. */
+@source "../../src/**/*.{ts,tsx}";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* App ground. tokens.css is unlayered, so this can't live in layered app.css;
+ * the website's site-theme.css sets it back for marketing pages. */
+:root {
+  --bg: #FDFAF2;
+  --side: var(--neutral-0);
+}
+
+/* next/font hashes family names, so the token font stacks point at its variables. */
+:root {
+  --font-sans: var(--font-inter-tight), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-label: var(--font-raleway), var(--font-inter-tight), system-ui, sans-serif;
+  --font-display: var(--font-rammetto), "Arial Black", system-ui, sans-serif;
+}
+
+/* Tailwind / shadcn names mapped onto the design tokens, so every existing
+ * screen re-themes from this one block. */
+@theme inline {
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--text);
+  --color-popover: var(--surface-raised);
+  --color-popover-foreground: var(--text);
+  --color-primary: var(--brand);
+  --color-primary-foreground: var(--on-brand);
+  --color-secondary: var(--surface-sunken);
+  --color-secondary-foreground: var(--text);
+  --color-muted: var(--surface-sunken);
+  --color-muted-foreground: var(--text-muted);
+  --color-accent: var(--brand-subtle);
+  --color-accent-foreground: var(--brand-text);
+  --color-success: var(--success);
+  --color-success-foreground: var(--neutral-0);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--neutral-0);
+  --color-destructive: var(--danger);
+  --color-destructive-foreground: var(--neutral-0);
+  --color-border: var(--border);
+  --color-input: var(--border-strong);
+  --color-ring: var(--focus-ring);
+
+  --color-sidebar: var(--surface);
+  --color-sidebar-foreground: var(--text);
+  --color-sidebar-primary: var(--brand);
+  --color-sidebar-primary-foreground: var(--on-brand);
+  --color-sidebar-accent: var(--surface-sunken);
+  --color-sidebar-accent-foreground: var(--text);
+  --color-sidebar-border: var(--border);
+  --color-sidebar-ring: var(--focus-ring);
+
+  --color-chart-1: var(--sky-700);
+  --color-chart-2: var(--coral-500);
+  --color-chart-3: var(--teal-600);
+  --color-chart-4: var(--amber-500);
+  --color-chart-5: var(--violet-500);
+
+  --font-sans: var(--font-inter-tight), system-ui, sans-serif;
+  --font-display: var(--font-rammetto), "Arial Black", sans-serif;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+  --radius-xl: 14px;
+  --radius-2xl: 22px;
+
+  --shadow-card: 0 2px 6px rgba(10, 35, 38, 0.08);
+  --shadow-card-hover: 0 10px 24px -8px rgba(10, 35, 38, 0.2);
+  --shadow-elevated: 0 24px 56px -16px rgba(10, 35, 38, 0.32);
+
+  --container-2xl: 1400px;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-family: var(--font-sans);
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeInUp 0.5s ease-out both;
+  }
+
+  .bg-gradient-hero { background-image: linear-gradient(135deg, var(--teal-900) 0%, var(--teal-700) 100%); }
+  .bg-gradient-accent { background-image: linear-gradient(135deg, var(--teal-600) 0%, var(--teal-100) 100%); }
+  .bg-gradient-card { background-image: linear-gradient(180deg, var(--surface) 0%, var(--teal-50) 100%); }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Signature faces (0040) ───────────────────────────────────────────
+ * Back the Style tab of the adopt-signature panel. Self-hosted rather
+ * than pulled from a font CDN: a third party has no business being told
+ * the moment a tenant signs a legal document, and a CDN blip must not be
+ * able to change what a signature looks like.
+ *
+ * `font-display: swap` plus lazy fetching — the browser only requests
+ * these when the panel actually renders — keeps them off every other
+ * page. Provenance and licence: public/fonts/README.md (SIL OFL 1.1).
+ */
+@font-face {
+  font-family: 'LISTD Signature Caveat';
+  src: url('/fonts/signature-caveat.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'LISTD Signature Dancing';
+  src: url('/fonts/signature-dancing.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'LISTD Signature Sacramento';
+  src: url('/fonts/signature-sacramento.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
