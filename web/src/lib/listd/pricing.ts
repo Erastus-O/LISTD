@@ -521,23 +521,20 @@ export function portfolioLine(pr: Pricing, pct: number, lines: QuoteLine[], proP
   return off > 0 ? line(`Portfolio rate (${pct}% agreed)`, -off, 'portfolio') : null
 }
 
-/* ---- coverage: Bristol and the South West for everything; Birmingham cleaning only ---- */
+/* ---- coverage: every service, anywhere in the UK ---- */
 
-export const COVERAGE = {
-  ALL: ['BS', 'BA', 'GL', 'SN', 'TA', 'EX', 'TQ', 'PL', 'TR', 'DT', 'BH', 'SP'],
-  CLEANING: ['B'],
-}
+/** Full UK postcode, with or without the space (e.g. "SW1A 1AA", "bs81th"). */
+const UK_POSTCODE = /^(GIR ?0AA|[A-Z]{1,2}\d[A-Z\d]? ?\d[A-Z]{2})$/
 
 export function postcodeArea(pc: string | null | undefined): string {
   return /^[A-Z]+/.exec(String(pc ?? '').trim().toUpperCase())?.[0] ?? ''
 }
 
-/** Null when the service is available at the postcode, otherwise the message to show. */
-export function coverageBlock(postcode: string | null | undefined, service: ServiceKey, serviceLabel: string): string | null {
-  const area = postcodeArea(postcode)
-  if (COVERAGE.ALL.includes(area)) return null
-  if (COVERAGE.CLEANING.includes(area)) {
-    return service === 'CLEANING' ? null : `In Birmingham we offer cleaning now. ${serviceLabel} is coming soon.`
-  }
-  return `LISTD isn’t in ${area || 'this area'} yet. We cover Bristol, the South West and Birmingham, and we’re coming to your area soon.`
+export function isUkPostcode(pc: string | null | undefined): boolean {
+  return UK_POSTCODE.test(String(pc ?? '').trim().toUpperCase().replace(/\s+/g, ' '))
+}
+
+/** Null when the service can be booked at the postcode, otherwise the message to show. */
+export function coverageBlock(postcode: string | null | undefined, _service: ServiceKey, _serviceLabel: string): string | null {
+  return isUkPostcode(postcode) ? null : 'Add a full UK postcode to this property to book.'
 }

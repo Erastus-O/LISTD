@@ -1,5 +1,4 @@
 import {
-  COVERAGE,
   feeFromBase,
   priceCleaning,
   priceDiagnosis,
@@ -223,5 +222,3 @@ export function planService(
 export function isSameVisit(services: ServiceKey[], requested: boolean | undefined): boolean {
   return services.includes('INVENTORY') && services.includes('CHECK_IN') && requested !== false
 }
-
-export { COVERAGE }

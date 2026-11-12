@@ -212,17 +212,16 @@ describe('contribution floor and portfolio', () => {
 })
 
 describe('coverage', () => {
-  it('Bristol and the South West get every service', () => {
-    expect(coverageBlock('BS8 1TH', 'CHECK_OUT', 'Check-Out')).toBeNull()
-    expect(coverageBlock('ex1 1aa', 'REPAIRS_DAMAGES', 'Repairs')).toBeNull()
+  it('allows every service at any UK postcode', () => {
+    for (const pc of ['BS8 1TH', 'ex1 1aa', 'B12 9AA', 'M1 1AA', 'SW1A 1AA', 'E1 6AN', 'N1C 4AG', 'EC1A 1BB', 'W1D 3QF', 'G2 1DY', 'CF10 1EP', 'BT1 5GS', 'se228jx']) {
+      expect(coverageBlock(pc, 'CHECK_OUT', 'Check-Out')).toBeNull()
+      expect(coverageBlock(pc, 'CLEANING', 'Cleaning')).toBeNull()
+    }
   })
-  it('Birmingham has cleaning only', () => {
-    expect(coverageBlock('B12 9AA', 'CLEANING', 'Cleaning')).toBeNull()
-    expect(coverageBlock('B12 9AA', 'CHECK_OUT', 'Check-Out')).toMatch(/coming soon/)
-  })
-  it('does not confuse BS or BA with B, and refuses other areas', () => {
-    expect(coverageBlock('BA1 1AA', 'CHECK_OUT', 'Check-Out')).toBeNull()
-    expect(coverageBlock('M1 1AA', 'CLEANING', 'Cleaning')).toMatch(/isn’t in M/)
+  it('refuses a missing or incomplete postcode', () => {
+    for (const pc of [null, '', 'SW1', 'BS8', '12345', 'not a postcode']) {
+      expect(coverageBlock(pc, 'CHECK_OUT', 'Check-Out')).toMatch(/full UK postcode/)
+    }
   })
 })
 
