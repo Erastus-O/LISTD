@@ -38,6 +38,7 @@ import {
 } from '@/components/auth/auth-ui'
 import { createClient } from '@/lib/supabase/client'
 import { PRIVACY_POLICY_VERSION } from '@/lib/legal/policy'
+import { PRO_SERVICES, isProServiceRole, type ProServiceRole } from '@/lib/listd/pro-services'
 import { cn } from '@/lib/utils'
 import { ForgotPasswordForm } from './forgot-password-form'
 
@@ -61,7 +62,7 @@ const signUpSchema = z
 type SignInFormData = z.infer<typeof signInSchema>
 type SignUpFormData = z.infer<typeof signUpSchema>
 
-type Role = 'client' | 'clerk' | 'cleaner' | 'trades'
+type Role = 'client' | 'pro'
 
 const ROLES: Array<{
   value: Role
@@ -70,10 +71,10 @@ const ROLES: Array<{
   hint: string
 }> = [
   { value: 'client', icon: Building2, label: 'Client', hint: 'Agent or landlord' },
-  { value: 'clerk', icon: ClipboardCheck, label: 'Pro Clerk', hint: 'Inventories and inspections' },
-  { value: 'cleaner', icon: Sparkles, label: 'Pro Cleaner', hint: 'Cleaning' },
-  { value: 'trades', icon: Wrench, label: 'Pro Trades', hint: 'Repairs and maintenance' },
+  { value: 'pro', icon: ClipboardCheck, label: 'Pro', hint: 'Inspections, cleaning or repairs' },
 ]
+
+const SERVICE_ICON: Record<ProServiceRole, LucideIcon> = { clerk: ClipboardCheck, cleaner: Sparkles, trades: Wrench }
 
 export function AuthForm() {
   const router = useRouter()
@@ -84,11 +85,14 @@ export function AuthForm() {
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>(initialTab)
   const [showForgotPassword, setShowForgotPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  // Old links (?role=clerk|cleaner|trades) open the Pro sign-up with that service ticked.
   const roleParam = searchParams.get('role')
   const [selectedRole, setSelectedRole] = useState<Role | null>(
-    ROLES.some((r) => r.value === roleParam) ? (roleParam as Role) : null
+    roleParam === 'client' ? 'client' : roleParam === 'pro' || isProServiceRole(roleParam) ? 'pro' : null
   )
+  const [services, setServices] = useState<ProServiceRole[]>(isProServiceRole(roleParam) ? [roleParam] : [])
   const [roleError, setRoleError] = useState(false)
+  const [servicesError, setServicesError] = useState(false)
   const [consentChecked, setConsentChecked] = useState(false)
   const [consentError, setConsentError] = useState(false)
 
@@ -138,6 +142,11 @@ export function AuthForm() {
       return
     }
     setRoleError(false)
+    if (selectedRole === 'pro' && services.length === 0) {
+      setServicesError(true)
+      return
+    }
+    setServicesError(false)
     if (!consentChecked) {
       setConsentError(true)
       return
@@ -157,6 +166,7 @@ export function AuthForm() {
         data: {
           full_name: data.fullName,
           role: selectedRole,
+          ...(selectedRole === 'pro' ? { services } : {}),
           privacy_policy_version: PRIVACY_POLICY_VERSION,
           privacy_consent_at: consentAt,
         },
@@ -185,6 +195,7 @@ export function AuthForm() {
       // leaving name / email / password sitting in the form.
       signUpForm.reset()
       setSelectedRole(null)
+      setServices([])
       setConsentChecked(false)
       return
     }
@@ -379,6 +390,45 @@ export function AuthForm() {
                   </p>
                 )}
               </fieldset>
+
+              {selectedRole === 'pro' && (
+                <fieldset className="space-y-2">
+                  <legend className="mb-2 text-sm font-medium text-foreground">
+                    Services I offer (pick any)
+                  </legend>
+                  <div className="grid gap-2">
+                    {PRO_SERVICES.map(({ role, label, hint }) => {
+                      const Icon = SERVICE_ICON[role]
+                      const on = services.includes(role)
+                      return (
+                        <label
+                          key={role}
+                          className={cn(
+                            'flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors',
+                            on ? 'border-primary bg-primary/[0.06]' : 'border-border hover:bg-muted/40'
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 accent-primary"
+                            checked={on}
+                            onChange={() => {
+                              setServices((prev) => (prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]))
+                              setServicesError(false)
+                            }}
+                          />
+                          <Icon className="h-4 w-4 text-muted-foreground" aria-hidden />
+                          <span className="grid">
+                            <span className="text-sm font-semibold">{label}</span>
+                            <span className="text-[11px] leading-tight text-muted-foreground">{hint}</span>
+                          </span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                  {servicesError && <p className="text-sm text-destructive">Pick at least one service</p>}
+                </fieldset>
+              )}
 
               <FormField
                 control={signUpForm.control}

@@ -14,7 +14,8 @@ import {
   type Tx,
 } from '@/db'
 import { logAuditEvent } from '@/lib/audit'
-import { feeFromBase, type Pricing, type ProBase, type ProRole } from './pricing'
+import { proNetFor, type Pricing, type ProRole, type QuoteLine } from './pricing'
+import { currentQuote } from './quotes'
 import { APP_ROLE_FOR, requiredLevelFor, roleForType } from './services'
 
 /**
@@ -239,20 +240,23 @@ export async function proJobBlock(
 }
 
 /**
- * Fee for the Pro who accepted: workload at THEIR level. Keeps the held payment
- * in step, so the later transfer pays the right amount. Jobs from before this
- * change have no pro_base and keep the payout stored on them.
+ * Fee for the Pro who accepted: the job price less LISTD's commission, the same
+ * at every level (levels open bigger jobs, they don't change the cut). Records
+ * the Pro's level and keeps the held payment in step, so the later transfer
+ * pays the right amount.
  */
 export async function setFeeForAcceptingPro(tx: Tx, pr: Pricing, jobId: string, userId: string) {
   const [job] = await tx
-    .select({ inspectionType: jobs.inspectionType, proBase: jobs.proBase })
+    .select({ inspectionType: jobs.inspectionType })
     .from(jobs)
     .where(eq(jobs.id, jobId))
     .limit(1)
-  if (!job?.proBase) return null
+  if (!job) return null
   const role = roleForType(job.inspectionType)
   const level = await getProLevel(tx, userId, role)
-  const feeP = feeFromBase(pr, job.proBase as ProBase, level)
+  const q = await currentQuote(tx, jobId)
+  if (!q) return null
+  const feeP = q.proFeeP ?? proNetFor(pr, q.lines as QuoteLine[])
   const pounds = (feeP / 100).toString()
   await tx
     .update(jobs)

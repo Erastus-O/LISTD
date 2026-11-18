@@ -1,22 +1,18 @@
 import { getPricing } from '@/lib/listd/pricing-settings'
 import { proJobBlock, proVerificationBlock, setFeeForAcceptingPro } from '@/lib/listd/pro-levels'
-import { and, eq, isNull, ne, sql } from 'drizzle-orm'
+import { and, eq, isNull, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { errorResponse, ok, conflict, notFound } from '@/lib/api'
 import { authorizeRequest } from '@/lib/dal'
 import {
   jobs,
-  notifications,
-  organisationMembers,
   profiles,
   properties,
   withServiceRole,
 } from '@/db'
 import { callerIp, callerUserAgent, logAuditEvent } from '@/lib/audit'
 import { isStripeConfigured } from '@/lib/billing/stripe'
-import { notifyUserSms } from '@/lib/notify-prefs'
-import { sendPushToUser } from '@/lib/push'
-import { emailPrimaryTenantSlotRequest } from '@/lib/tenant-slot-request'
+import { afterProAccept, runApprovalEffects } from '@/lib/listd/job-approval'
 import { ukWallTimeToUtcIso } from '@/lib/scheduling/exact-time'
 
 export const maxDuration = 15
@@ -160,27 +156,6 @@ export async function POST(req: Request, { params }: { params: Params }) {
           .set({ scheduledAt: scheduledAtIso })
           .where(eq(jobs.id, jobId))
       }
-      const arrivalPhrase = scheduledAtIso
-        ? ` Arrival confirmed for ${body.arrivalTime}.`
-        : ''
-
-      // Resolve the property address for the notification body — single
-      // extra SELECT, scoped to the property we just claimed.
-      const [prop] = job.propertyId
-        ? await tx
-            .select({
-              addressLine1: properties.addressLine1,
-              postcode: properties.postcode,
-            })
-            .from(properties)
-            .where(eq(properties.id, job.propertyId))
-            .limit(1)
-        : [null]
-      const addr = prop?.addressLine1
-        ? `${prop.addressLine1}${prop.postcode ? ', ' + prop.postcode : ''}`
-        : 'a property'
-      const refSlug = jobId.slice(0, 8)
-
       await logAuditEvent(tx, {
         category: 'job_lifecycle',
         action: 'job.accepted',
@@ -199,60 +174,10 @@ export async function POST(req: Request, { params }: { params: Params }) {
         userAgent: ua,
       })
 
-      // Notification fan-out:
-      //   - The job's client_id (worker or solo client) gets notified.
-      //   - If the job belongs to an org, every active owner also gets a
-      //     copy so they see the pipeline regardless of who posted it.
-      //   - The clerk gets their own activity-feed entry.
-      // Deduped by userId so a client who's also an org owner only sees
-      // one notification.
-      const recipients = new Map<string, { title: string; message: string; link: string }>()
-      recipients.set(job.clientId, {
-        title: 'Pro assigned',
-        message: `Your job ${refSlug} at ${addr} has been accepted by a verified Pro.${arrivalPhrase}`,
-        link: `/client/jobs/${jobId}`,
-      })
-      if (job.organisationId) {
-        const owners = await tx
-          .select({ userId: organisationMembers.userId })
-          .from(organisationMembers)
-          .where(
-            and(
-              eq(organisationMembers.organisationId, job.organisationId),
-              eq(organisationMembers.orgRole, 'owner'),
-              eq(organisationMembers.status, 'active'),
-              ne(organisationMembers.userId, job.clientId)
-            )
-          )
-        for (const o of owners) {
-          recipients.set(o.userId, {
-            title: 'Org job accepted',
-            message: `Job ${refSlug} at ${addr} (posted by a team member) has been accepted by a clerk.`,
-            link: `/client/jobs/${jobId}`,
-          })
-        }
-      }
-      recipients.set(session.userId, {
-        title: 'Job accepted',
-        message: `You've been assigned to ${refSlug} at ${addr}. Full details now available.`,
-        link: `/clerk/jobs/${jobId}`,
-      })
-      await tx.insert(notifications).values(
-        Array.from(recipients.entries()).map(([userId, n]) => ({
-          userId,
-          type: 'job',
-          title: n.title,
-          message: n.message,
-          link: n.link,
-        }))
-      )
-
-      // SMS targets: the client + any org owners (NOT the clerk, who just
-      // performed the accept and already knows). Fired after commit.
-      const smsTargets = Array.from(recipients.keys()).filter(
-        (id) => id !== session.userId
-      )
-      return { status: 'ok' as const, jobId, smsTargets, addr, refSlug, arrivalPhrase }
+      // LISTD approves before the address, codes and contacts unlock and the
+      // client hears a Pro is booked; auto-approved when the setting allows.
+      const approval = await afterProAccept(tx, { jobId, proId: session.userId, inspectionType: job.inspectionType })
+      return { status: 'ok' as const, jobId, approval }
     })
 
     if (result.status === 'not_verified') {
@@ -269,45 +194,9 @@ export async function POST(req: Request, { params }: { params: Params }) {
       return conflict('Job already claimed by another clerk')
     }
 
-    // Job-update SMS (gated by each recipient's `smsJobUpdates` pref +
-    // phone on file). Best-effort; never blocks or fails the accept.
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://listd.pro'
-    const smsBody = `LISTD: Your inspection ${result.refSlug} at ${result.addr} has been accepted by a clerk.${result.arrivalPhrase} ${siteUrl}/client/jobs/${result.jobId}`
-    await Promise.allSettled(
-      result.smsTargets.map((userId) =>
-        notifyUserSms(userId, 'smsJobUpdates', smsBody)
-      )
-    )
+    if (result.approval.effects) await runApprovalEffects(result.approval.effects, session.userId)
 
-    // Desktop/web push to the client (+ org owners) and the clerk. Best-effort;
-    // sendPushToUser never throws and no-ops when VAPID isn't configured.
-    await Promise.allSettled([
-      ...result.smsTargets.map((userId) =>
-        sendPushToUser(userId, {
-          title: 'Pro assigned',
-          body: `${result.refSlug} at ${result.addr} has been accepted.`,
-          url: `/client/jobs/${result.jobId}`,
-          tag: `job:${result.jobId}:accepted`,
-        })
-      ),
-      sendPushToUser(session.userId, {
-        title: 'Job accepted',
-        body: `You're assigned to ${result.refSlug} at ${result.addr}.`,
-        url: `/clerk/jobs/${result.jobId}`,
-        tag: `job:${result.jobId}:accepted`,
-      }),
-    ])
-
-    // Email the primary tenant their slot-picker link (best-effort; no-ops if
-    // there's no specific timeframe or no tenant email).
-    await emailPrimaryTenantSlotRequest({
-      jobId: result.jobId,
-      issuedBy: session.userId,
-    }).catch((e) =>
-      console.warn('[clerk/jobs/accept] tenant slot email failed:', e)
-    )
-
-    return ok({ success: true, jobId: result.jobId })
+    return ok({ success: true, jobId: result.jobId, awaitingApproval: !result.approval.approved })
   } catch (err) {
     console.error('[clerk/jobs/accept] error:', err)
     return errorResponse(err)

@@ -15,6 +15,8 @@ import {
   FileText,
   HardHat,
   Megaphone,
+  MessageSquare,
+  UserCheck,
   LayoutDashboard,
   PoundSterling,
   Receipt,
@@ -40,6 +42,8 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { title: 'Overview', href: '/admin/dashboard', icon: LayoutDashboard, exact: true },
   { title: 'Bookings', href: '/admin/jobs', icon: Briefcase },
+  { title: 'Approvals', href: '/admin/approvals', icon: UserCheck },
+  { title: 'Messages', href: '/admin/messages', icon: MessageSquare },
   { title: 'Training', href: '/admin/training', icon: GraduationCap },
   { title: 'Clients', href: '/admin/clients', icon: Users },
   { title: 'Pros', href: '/admin/clerks', icon: HardHat },

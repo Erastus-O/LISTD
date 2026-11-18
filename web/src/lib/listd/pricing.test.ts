@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_PRICING as pr,
   addWorkDays,
+  bookingFee,
   contribution,
   coverageBlock,
   feeFromBase,
@@ -13,7 +14,11 @@ import {
   priceCleaning,
   priceDiagnosis,
   priceInspection,
+  proNet,
+  proNetFor,
+  quoteTotals,
   repairProFee,
+  requoteTotals,
   schedForDate,
   workDaysUntil,
   type InspectionKey,
@@ -222,6 +227,51 @@ describe('coverage', () => {
     for (const pc of [null, '', 'SW1', 'BS8', '12345', 'not a postcode']) {
       expect(coverageBlock(pc, 'CHECK_OUT', 'Check-Out')).toMatch(/full UK postcode/)
     }
+  })
+})
+
+describe('LISTD fees: 10% from the Pro, 10% booking fee from the client', () => {
+  const job = (p: number) => [{ d: 'Job', q: 1, u: p, tag: 'svc' as const }]
+  it('client example: £150 job, Pro earns £135, client pays £165, LISTD keeps £30', () => {
+    const t = quoteTotals(pr, job(15000))
+    expect(t.bookingFeeP).toBe(1500)
+    expect(t.totalP).toBe(16500)
+    expect(proNetFor(pr, job(15000))).toBe(13500)
+    expect(t.totalP - proNetFor(pr, job(15000))).toBe(3000)
+  })
+  it('booking fee is never under £5: a £40 job costs the client £45', () => {
+    expect(bookingFee(pr, 4000)).toBe(500)
+    expect(quoteTotals(pr, job(4000)).totalP).toBe(4500)
+    expect(bookingFee(pr, 5000)).toBe(500)
+    expect(bookingFee(pr, 5100)).toBe(510)
+    expect(bookingFee(pr, 0)).toBe(0)
+  })
+  it('the booking fee is on the price after a discount; the Pro keeps the full net', () => {
+    const t = quoteTotals(pr, job(15000), 3000)
+    expect(t.jobP).toBe(12000)
+    expect(t.bookingFeeP).toBe(1200)
+    expect(t.totalP).toBe(13200)
+    expect(proNetFor(pr, [...job(15000), { d: 'Portfolio rate', q: 1, u: -1500, tag: 'portfolio' }])).toBe(13500)
+  })
+  it('the same cut at every level and for every service', () => {
+    expect(proNet(pr, 10000)).toBe(9000)
+    const inv = priceInspection(pr, 'INVENTORY', flat()) as PricedJob
+    expect(proNetFor(pr, inv.lines)).toBe(Math.round(linesTotal(inv.lines) * 0.9))
+    expect(proNetFor(pr, priceDiagnosis(pr).lines)).toBe(4500)
+  })
+  it('requote: both fees recalculated on the new total, with the £5 minimum', () => {
+    // £40 job (fee £5) plus £30 extra: new total £70, fee £7.
+    const r = requoteTotals(pr, { clientJobP: 4000, proJobP: 4000 }, 3000)
+    expect(r.bookingFeeP).toBe(700)
+    expect(r.clientExtraP).toBe(3000 + 200)
+    expect(r.proNetP).toBe(6300)
+    expect(r.proExtraP).toBe(6300 - 3600)
+  })
+  it('percentages and the minimum are admin settings', () => {
+    const m = mergePricing({ fees: { proPct: 15, clientMinP: 300 } })
+    expect(m.fees.clientPct).toBe(10)
+    expect(proNet(m, 10000)).toBe(8500)
+    expect(bookingFee(m, 2000)).toBe(300)
   })
 })
 

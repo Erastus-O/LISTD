@@ -117,8 +117,7 @@ export async function loadAvailableJobs(
         serviceTier: jobs.serviceTier,
         clerkPayout: jobs.clerkPayout,
         clerkPayoutBreakdown: jobs.clerkPayoutBreakdown,
-        specialInstructions: jobs.specialInstructions,
-        shortNoticeSurcharge: jobs.shortNoticeSurchargeApplied,
+                shortNoticeSurcharge: jobs.shortNoticeSurchargeApplied,
         createdAt: jobs.createdAt,
         propertyId: properties.id,
         postcode: properties.postcode,
@@ -191,7 +190,9 @@ export async function loadAvailableJobs(
       serviceTier: r.serviceTier,
       clerkPayout: r.clerkPayout,
       payoutLines: parseClerkPayoutLines(r.clerkPayoutBreakdown),
-      specialInstructions: r.specialInstructions,
+      // Access instructions can hold key-safe codes: shared only once a Pro is
+      // assigned and LISTD has approved, never on the open job board.
+      specialInstructions: null,
       shortNoticeSurcharge: r.shortNoticeSurcharge,
       createdAt: r.createdAt,
       property: {

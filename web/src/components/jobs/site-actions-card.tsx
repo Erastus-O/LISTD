@@ -34,7 +34,7 @@ import { createClient } from '@/lib/supabase/client'
 
 export type SiteEventSummary = {
   id: string
-  kind: 'arrival' | 'running_late' | 'no_access'
+  kind: 'arrival' | 'running_late' | 'no_access' | 'check_out'
   createdAt: string
   etaMinutes: number | null
   reason: string | null
@@ -46,6 +46,8 @@ type Props = {
   apiBase: '/api/clerk' | '/api/cleaner'
   /** This actor's existing site events for the job, oldest first. */
   initialEvents: SiteEventSummary[]
+  /** Job status: check-out is offered once the work is in progress. */
+  status?: string
 }
 
 const MAX_PHOTO_BYTES = 12 * 1024 * 1024
@@ -90,11 +92,12 @@ function getPosition(): Promise<GeolocationPosition | null> {
  * running-late flag, and the structured no-access report. Framework
  * §14 items 1/3/4 — the evidence layer everything else keys off.
  */
-export function SiteActionsCard({ jobId, apiBase, initialEvents }: Props) {
+export function SiteActionsCard({ jobId, apiBase, initialEvents, status }: Props) {
   const router = useRouter()
   const [pending, setPending] = useState<string | null>(null)
 
   const arrival = initialEvents.find((e) => e.kind === 'arrival') ?? null
+  const checkOut = initialEvents.find((e) => e.kind === 'check_out') ?? null
   const lateFlag =
     [...initialEvents].reverse().find((e) => e.kind === 'running_late') ?? null
   const noAccess =
@@ -103,6 +106,8 @@ export function SiteActionsCard({ jobId, apiBase, initialEvents }: Props) {
   // Check-in photo
   const photoInputRef = useRef<HTMLInputElement>(null)
   const [checkinPhoto, setCheckinPhoto] = useState<File | null>(null)
+  const outPhotoRef = useRef<HTMLInputElement>(null)
+  const [checkoutPhoto, setCheckoutPhoto] = useState<File | null>(null)
 
   // Running-late dialog
   const [lateOpen, setLateOpen] = useState(false)
@@ -168,12 +173,14 @@ export function SiteActionsCard({ jobId, apiBase, initialEvents }: Props) {
   }
 
   async function handleCheckin() {
+    if (!checkinPhoto) {
+      toast.error('Add a photo of the front of the building first')
+      return
+    }
     setPending('checkin')
     try {
-      const [pos, photoPaths] = await Promise.all([
-        getPosition(),
-        checkinPhoto ? uploadPhotos([checkinPhoto], 'arrival') : Promise.resolve([]),
-      ])
+      const [pos, photoPaths] = await Promise.all([getPosition(), uploadPhotos([checkinPhoto], 'arrival')])
+      if (!photoPaths.length) return
       const okPost = await post(
         {
           kind: 'arrival',
@@ -194,6 +201,32 @@ export function SiteActionsCard({ jobId, apiBase, initialEvents }: Props) {
             ? 'Arrival recorded with your location.'
             : 'Arrival recorded. (Location unavailable — the timestamp and photo still count.)',
         })
+        router.refresh()
+      }
+    } finally {
+      setPending(null)
+    }
+  }
+
+  async function handleCheckout() {
+    if (!checkoutPhoto) {
+      toast.error('Add a photo of the building first')
+      return
+    }
+    setPending('checkout')
+    try {
+      const [pos, photoPaths] = await Promise.all([getPosition(), uploadPhotos([checkoutPhoto], 'check-out')])
+      if (!photoPaths.length) return
+      const okPost = await post(
+        {
+          kind: 'check_out',
+          ...(pos ? { latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracyM: pos.coords.accuracy } : {}),
+          photoPaths,
+        },
+        'checkout'
+      )
+      if (okPost) {
+        toast.success('Checked out', { description: 'You can now finish and submit the job.' })
         router.refresh()
       }
     } finally {
@@ -275,15 +308,48 @@ export function SiteActionsCard({ jobId, apiBase, initialEvents }: Props) {
 
         {/* ── Check-in ── */}
         {arrival ? (
-          <p className="flex items-center gap-1.5 text-sm text-success">
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
-            Checked in at {fmtTime(arrival.createdAt)}
-          </p>
+          <div className="space-y-2">
+            <p className="flex items-center gap-1.5 text-sm text-success">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              Checked in at {fmtTime(arrival.createdAt)}
+            </p>
+            {checkOut ? (
+              <p className="flex items-center gap-1.5 text-sm text-success">
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                Checked out at {fmtTime(checkOut.createdAt)}
+              </p>
+            ) : status === 'in_progress' ? (
+              <div className="space-y-2 border-t border-border pt-3">
+                <p className="text-xs text-muted-foreground">
+                  Finished on site? Check out with a photo of the front of the building before you submit.
+                </p>
+                <input
+                  ref={outPhotoRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => setCheckoutPhoto(e.target.files?.[0] ?? null)}
+                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => outPhotoRef.current?.click()} disabled={pending !== null} className="gap-1.5">
+                    <Camera className="h-3.5 w-3.5" />
+                    {checkoutPhoto ? 'Photo attached ✓' : 'Photo of the building'}
+                  </Button>
+                  <Button type="button" onClick={handleCheckout} disabled={pending !== null || !checkoutPhoto} className="gap-1.5">
+                    {pending === 'checkout' ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
+                    Check out
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+          </div>
         ) : (
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground">
-              Check in when you arrive — it timestamps your attendance and is
-              your evidence if anything goes wrong with access.
+              Check in when you arrive with a photo of the front of the
+              building. It timestamps your attendance and is your evidence if
+              anything goes wrong with access.
             </p>
             <input
               ref={photoInputRef}
@@ -297,7 +363,7 @@ export function SiteActionsCard({ jobId, apiBase, initialEvents }: Props) {
               <Button
                 type="button"
                 onClick={handleCheckin}
-                disabled={pending !== null}
+                disabled={pending !== null || !checkinPhoto}
                 className="gap-1.5"
               >
                 {pending === 'checkin' ? (
@@ -305,7 +371,7 @@ export function SiteActionsCard({ jobId, apiBase, initialEvents }: Props) {
                 ) : (
                   <MapPin className="h-4 w-4" />
                 )}
-                Check in — I&rsquo;ve arrived
+                Check in: I&rsquo;ve arrived
               </Button>
               <Button
                 type="button"
@@ -316,7 +382,7 @@ export function SiteActionsCard({ jobId, apiBase, initialEvents }: Props) {
                 className="gap-1.5"
               >
                 <Camera className="h-3.5 w-3.5" />
-                {checkinPhoto ? 'Photo attached ✓' : 'Add doorstep photo'}
+                {checkinPhoto ? 'Photo attached ✓' : 'Photo of the front of the building'}
               </Button>
             </div>
           </div>

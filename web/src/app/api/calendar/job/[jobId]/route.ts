@@ -1,3 +1,4 @@
+import { awaitingListd } from '@/lib/listd/job-approval'
 import { and, eq, or } from 'drizzle-orm'
 import { errorResponse, forbidden, notFound, unauthorized } from '@/lib/api'
 import { getSession } from '@/lib/dal'
@@ -55,6 +56,8 @@ export async function GET(_req: Request, { params }: { params: Params }) {
           accessCollection: jobs.accessCollection,
           accessParkingNotes: jobs.accessParkingNotes,
           specialInstructions: jobs.specialInstructions,
+          status: jobs.status,
+          listdApprovedAt: jobs.listdApprovedAt,
         })
         .from(jobs)
         .where(eq(jobs.id, jobId))
@@ -85,6 +88,10 @@ export async function GET(_req: Request, { params }: { params: Params }) {
       }
 
       if (!isAdmin && !isClient && !isClerk && !isOrgOwner) {
+        return { forbidden: true as const }
+      }
+      // A Pro gets the calendar entry once LISTD approves (it holds the address and codes).
+      if (isClerk && !isAdmin && !isClient && awaitingListd(job)) {
         return { forbidden: true as const }
       }
 

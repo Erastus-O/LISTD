@@ -16,6 +16,10 @@ import { jobSiteEvents, withServiceRole } from '@/db'
 import { asc, eq } from 'drizzle-orm'
 import { formatUkTime } from '@/lib/scheduling/exact-time'
 import { StatusPill } from '@/components/listd/job-status'
+import { JobThread } from '@/components/listd/job-thread'
+import { RequotePanel } from '@/components/listd/requote-panel'
+import { cleaningAreas } from '@/lib/listd/area-frames'
+import { loadThread } from '@/lib/listd/job-messages'
 
 export const metadata = { title: 'Cleaner · Job detail' }
 export const dynamic = 'force-dynamic'
@@ -38,11 +42,12 @@ export default async function CleanerJobDetailPage({ params }: Props) {
     pricing.cleaning
   )
   const pay = Number(job.cleanerFinalPayout ?? job.cleanerPayout ?? 0)
+  const thread = await loadThread(jobId, 'pro', session.roles.includes('admin') ? 'listd' : 'pro')
 
   // On-site events (0038) — arrival / running-late / no-access drive the
   // On-site card while the job is live. Defensive fallback for a DB that
   // hasn't run the migration yet.
-  const isOnSitePhase = ['accepted', 'assigned', 'in_progress'].includes(
+  const isOnSitePhase = !job.awaitingListd && ['accepted', 'assigned', 'in_progress'].includes(
     job.status
   )
   const siteEvents: SiteEventSummary[] = isOnSitePhase
@@ -139,22 +144,47 @@ export default async function CleanerJobDetailPage({ params }: Props) {
         </CardContent>
       </Card>
 
+      {job.awaitingListd && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="space-y-1 p-4">
+            <p className="text-sm font-medium text-foreground">Waiting for LISTD approval</p>
+            <p className="text-xs text-muted-foreground">
+              LISTD checks every booking during the beta. Once it&apos;s approved you&apos;ll get the full address, access codes and the job brief here and by email.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {isOnSitePhase && (
         <SiteActionsCard
           jobId={jobId}
           apiBase="/api/cleaner"
           initialEvents={siteEvents}
+          status={job.status}
         />
       )}
 
-      {checklist && (
+      {isOnSitePhase && <RequotePanel jobId={jobId} />}
+
+      {checklist && !job.awaitingListd && (
         <CleanerJobActions
           jobId={jobId}
           status={job.status}
           tasks={checklist.tasks}
           completion={job.completion}
+          areas={cleaningAreas(job.areaCounts)}
         />
       )}
+
+      <JobThread
+        jobId={jobId}
+        channel="pro"
+        me={session.roles.includes('admin') ? 'listd' : 'pro'}
+        title="Messages with LISTD"
+        hint="Questions, access problems or anything the client needs to know. LISTD passes it on."
+        messages={thread}
+        disabled={['completed', 'paid', 'cancelled'].includes(job.status)}
+      />
     </div>
   )
 }

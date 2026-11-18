@@ -1,8 +1,8 @@
 import {
-  feeFromBase,
   priceCleaning,
   priceDiagnosis,
   priceInspection,
+  proNetFor,
   quoteTotals,
   requiredCleanLevel,
   type CleanAddon,
@@ -151,11 +151,13 @@ export type ServicePlan = {
   mode: 'pay' | 'quote'
   lines: QuoteLine[]
   subP: number
+  /** LISTD's booking fee, shown to the client as its own line. */
+  bookingFeeP: number
   taxP: number
   totalP: number
   /** Workload behind the fee; null for repairs, where the fee is set on the quote. */
   proBase: ProBase | null
-  /** Fee when a Pro of the minimum level accepts, or the fixed repair fee. */
+  /** What the Pro earns: the job price less LISTD's commission. */
   proFeeP: number | null
   durationMin: number | null
   /** Cleaning shows this range until LISTD confirms the fixed quote. */
@@ -190,10 +192,11 @@ export function planService(
       mode: 'quote',
       lines: r.lines,
       subP: t.subP,
+      bookingFeeP: t.bookingFeeP,
       taxP: t.taxP,
       totalP: t.totalP,
       proBase: r.proBase,
-      proFeeP: feeFromBase(pr, r.proBase),
+      proFeeP: proNetFor(pr, r.lines),
       durationMin: r.durationMin,
       estLowP: r.estLowP,
       estHighP: r.estHighP,
@@ -205,17 +208,17 @@ export function planService(
     if (scope.repairMode === 'diagnose') {
       const d = priceDiagnosis(pr)
       const t = quoteTotals(pr, d.lines)
-      return { ...base, mode: 'pay', lines: d.lines, subP: t.subP, taxP: t.taxP, totalP: t.totalP, proBase: null, proFeeP: d.proFeeP, durationMin: d.durationMin }
+      return { ...base, mode: 'pay', lines: d.lines, subP: t.subP, bookingFeeP: t.bookingFeeP, taxP: t.taxP, totalP: t.totalP, proBase: null, proFeeP: proNetFor(pr, d.lines), durationMin: d.durationMin }
     }
-    return { ...base, mode: 'quote', lines: [], subP: 0, taxP: 0, totalP: 0, proBase: null, proFeeP: null, durationMin: null, reason: 'priced from the damage reported' }
+    return { ...base, mode: 'quote', lines: [], subP: 0, bookingFeeP: 0, taxP: 0, totalP: 0, proBase: null, proFeeP: null, durationMin: null, reason: 'priced from the damage reported' }
   }
 
   const r = priceInspection(pr, service as InspectionKey, property, { combo: o.sameVisit, sched: o.sched })
   if ('custom' in r) {
-    return { ...base, mode: 'quote', lines: [], subP: 0, taxP: 0, totalP: 0, proBase: null, proFeeP: null, durationMin: null, reason: r.custom }
+    return { ...base, mode: 'quote', lines: [], subP: 0, bookingFeeP: 0, taxP: 0, totalP: 0, proBase: null, proFeeP: null, durationMin: null, reason: r.custom }
   }
   const t = quoteTotals(pr, r.lines)
-  return { ...base, mode: 'pay', lines: r.lines, subP: t.subP, taxP: t.taxP, totalP: t.totalP, proBase: r.proBase, proFeeP: feeFromBase(pr, r.proBase), durationMin: r.durationMin }
+  return { ...base, mode: 'pay', lines: r.lines, subP: t.subP, bookingFeeP: t.bookingFeeP, taxP: t.taxP, totalP: t.totalP, proBase: r.proBase, proFeeP: proNetFor(pr, r.lines), durationMin: r.durationMin }
 }
 
 /** Inventory + check-in booked together on one visit share the combined price. */

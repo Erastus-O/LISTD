@@ -1311,6 +1311,11 @@ export const jobs = pgTable("jobs", {
 	approvedAt: timestamp("approved_at", { withTimezone: true, mode: 'string' }),
 	approvalMode: text("approval_mode"),
 	payoutEligibleAt: timestamp("payout_eligible_at", { withTimezone: true, mode: 'string' }),
+	// 0043: LISTD approves a Pro's accept before site details unlock.
+	listdApprovedAt: timestamp("listd_approved_at", { withTimezone: true, mode: 'string' }),
+	listdApprovedBy: uuid("listd_approved_by"),
+	listdApprovalMode: text("listd_approval_mode"),
+	briefSentAt: timestamp("brief_sent_at", { withTimezone: true, mode: 'string' }),
 }, (table) => [
 	foreignKey({
 			columns: [table.propertyId],
@@ -1490,8 +1495,8 @@ export const jobSiteEvents = pgTable("job_site_events", {
 	}).onDelete('cascade'),
 	index("job_site_events_job_created_idx").on(table.jobId, table.createdAt),
 	index("job_site_events_kind_created_idx").on(table.kind, table.createdAt),
-	check("job_site_events_kind_check", sql`kind IN ('arrival', 'running_late', 'no_access')`),
-	check("job_site_events_actor_role_check", sql`actor_role IN ('clerk', 'cleaner', 'admin')`),
+	check("job_site_events_kind_check", sql`kind IN ('arrival', 'running_late', 'no_access', 'check_out')`),
+	check("job_site_events_actor_role_check", sql`actor_role IN ('clerk', 'cleaner', 'trades', 'admin')`),
 ]);
 
 // ── 0042: new interface backend ──────────────────────────────────────────
@@ -1536,7 +1541,25 @@ export const changeOrders = pgTable("change_orders", {
 	pricedAt: timestamp("priced_at", { withTimezone: true, mode: 'string' }),
 	approvedAt: timestamp("approved_at", { withTimezone: true, mode: 'string' }),
 	paidAt: timestamp("paid_at", { withTimezone: true, mode: 'string' }),
+	// 0043: photo or video evidence from the Pro.
+	evidencePaths: jsonb("evidence_paths").default([]).notNull(),
+	decidedAt: timestamp("decided_at", { withTimezone: true, mode: 'string' }),
 })
+
+// 0043: job conversations. 'pro' = Pro and LISTD; 'client' = client and LISTD.
+// No direct Pro-to-client channel: LISTD relays. Server-side only.
+export const jobMessages = pgTable("job_messages", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	jobId: uuid("job_id").notNull().references(() => jobs.id, { onDelete: 'cascade' }),
+	channel: text().notNull(),
+	senderId: uuid("sender_id"),
+	senderSide: text("sender_side").notNull(),
+	body: text().notNull(),
+	attachmentPaths: jsonb("attachment_paths").default([]).notNull(),
+	readByListdAt: timestamp("read_by_listd_at", { withTimezone: true, mode: 'string' }),
+	readByPartyAt: timestamp("read_by_party_at", { withTimezone: true, mode: 'string' }),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [index("job_messages_job_channel_idx").on(table.jobId, table.channel, table.createdAt)])
 
 export const proRoleLevels = pgTable("pro_role_levels", {
 	userId: uuid("user_id").notNull(),

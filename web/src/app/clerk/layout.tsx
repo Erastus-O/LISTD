@@ -2,7 +2,8 @@ import { RoleLayoutShell } from '@/components/role/role-layout-shell'
 import { requireRole } from '@/lib/dal'
 import { countUnreadNotifications } from '@/lib/notifications'
 import { SupportChat } from '@/components/assistant/support-chat'
-import { ClerkSidebarNav } from './_components/clerk-sidebar-nav'
+import { ProSidebarNav } from '@/components/role/pro-sidebar-nav'
+import { proServicesOf } from '@/lib/listd/pro-services'
 
 export default async function ClerkLayout({
   children,
@@ -17,7 +18,7 @@ export default async function ClerkLayout({
     <RoleLayoutShell
       brand="LISTD Pro"
       brandHref="/clerk/dashboard"
-      nav={<ClerkSidebarNav />}
+      nav={<ProSidebarNav services={proServicesOf(session.roles)} />}
       userEmail={session.email}
       userName={session.profile?.fullName ?? null}
       userAvatarUrl={session.profile?.avatarUrl ?? null}

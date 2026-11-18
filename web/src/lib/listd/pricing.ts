@@ -95,6 +95,8 @@ export const DEFAULT_PRICING = {
   outdoorP: 1500,
   sched: { priorityP: 3000, priorityProP: 2000, priorityDays: 2, priorityOpen: true },
   floor: { minP: 2500, pct: 25 },
+  // LISTD's two-sided fee: a commission from the Pro and a booking fee from the client.
+  fees: { proPct: 10, clientPct: 10, clientMinP: 500 },
   costs: { payPct: 1.5, payFixedP: 20, opsP: 500, reworkPct: 3 },
   pro: {
     attendP: 1000,
@@ -462,10 +464,63 @@ export function linesTotal(lines: QuoteLine[]): number {
   return lines.reduce((a, l) => a + Math.round(l.q * l.u), 0)
 }
 
+/* ---- LISTD fees: 10% from the Pro, a 10% booking fee (minimum £5) from the client ---- */
+
+const fees = (pr: Pricing) => ({ ...DEFAULT_PRICING.fees, ...pr.fees })
+
+/** The client's booking fee on a job price: a percentage, never under the minimum. */
+export function bookingFee(pr: Pricing, jobP: number): number {
+  if (jobP <= 0) return 0
+  const f = fees(pr)
+  return Math.max(f.clientMinP, Math.round((jobP * f.clientPct) / 100))
+}
+
+/** What the Pro earns on a job price, after LISTD's commission. Pros only ever see this figure. */
+export function proNet(pr: Pricing, jobP: number): number {
+  return Math.max(0, Math.round((jobP * (100 - fees(pr).proPct)) / 100))
+}
+
+/**
+ * The job price the Pro's commission comes off: the quoted work, before discounts
+ * LISTD funds (promo codes, portfolio rates), so a discount never cuts a Pro's pay.
+ */
+export function jobPriceP(lines: QuoteLine[]): number {
+  return linesTotal(lines.filter((l) => l.tag !== 'portfolio' && l.tag !== 'credit'))
+}
+
+/** Pro's net for a set of quote lines. */
+export function proNetFor(pr: Pricing, lines: QuoteLine[]): number {
+  return proNet(pr, jobPriceP(lines))
+}
+
+/**
+ * Client totals: job price (after any discount), plus the booking fee as its own
+ * line, plus VAT if set. `totalP` is what the client pays.
+ */
 export function quoteTotals(pr: Pricing, lines: QuoteLine[], discP = 0) {
   const subP = linesTotal(lines)
-  const taxP = pr.taxPct ? Math.round((subP * pr.taxPct) / 100) : 0
-  return { subP, taxP, discP, totalP: Math.max(0, subP + taxP - discP) }
+  const jobP = Math.max(0, subP - discP)
+  const bookingFeeP = bookingFee(pr, jobP)
+  const taxP = pr.taxPct ? Math.round(((jobP + bookingFeeP) * pr.taxPct) / 100) : 0
+  return { subP, discP, jobP, bookingFeeP, taxP, totalP: jobP + bookingFeeP + taxP }
+}
+
+/**
+ * A requote for extra work: both fees are recalculated on the new total job price
+ * (the booking fee minimum still applies), so the client pays the difference and
+ * the Pro's net rises by the difference.
+ */
+export function requoteTotals(pr: Pricing, before: { clientJobP: number; proJobP: number }, extraP: number) {
+  const was = quoteTotals(pr, [{ d: 'job', q: 1, u: before.clientJobP, tag: 'svc' }])
+  const now = quoteTotals(pr, [{ d: 'job', q: 1, u: before.clientJobP + extraP, tag: 'svc' }])
+  return {
+    jobP: now.jobP,
+    bookingFeeP: now.bookingFeeP,
+    totalP: now.totalP,
+    clientExtraP: now.totalP - was.totalP,
+    proNetP: proNet(pr, before.proJobP + extraP),
+    proExtraP: proNet(pr, before.proJobP + extraP) - proNet(pr, before.proJobP),
+  }
 }
 
 /** What's left after direct delivery costs (excluding tax), against the floor. */

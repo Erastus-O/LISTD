@@ -372,7 +372,7 @@ export async function POST(req: Request) {
         jobId: payable[0].jobId,
         checkoutUrl: checkout.url,
         serviceLabel: payable.map((r) => SERVICE_LABEL[r.plan.service]).join(', '),
-        amountPounds: plan.payNowP / 100,
+        amountPounds: payable.reduce((a, r) => a + r.plan.totalP, 0) / 100,
         posterName: onBehalf
           ? 'LISTD (booked for you by our team)'
           : (session.profile?.fullName ?? 'A team member'),

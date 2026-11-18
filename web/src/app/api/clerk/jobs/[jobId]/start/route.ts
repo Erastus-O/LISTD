@@ -1,4 +1,5 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
+import { startBlock } from '@/lib/listd/on-site'
 import { conflict, errorResponse, forbidden, notFound, ok } from '@/lib/api'
 import { authorizeRequest } from '@/lib/dal'
 import { jobs, withServiceRole } from '@/db'
@@ -43,9 +44,11 @@ export async function POST(req: Request, { params }: { params: Params }) {
       if (job.clerkId !== session.userId) {
         return { status: 'forbidden' as const }
       }
-      if (job.status !== 'accepted') {
+      if (job.status !== 'accepted' && job.status !== 'assigned') {
         return { status: 'wrong_state' as const, current: job.status }
       }
+      const blocked = await startBlock(tx, jobId, session.roles.includes('admin'))
+      if (blocked) return { status: 'blocked' as const, message: blocked }
 
       const updated = await tx
         .update(jobs)
@@ -54,7 +57,7 @@ export async function POST(req: Request, { params }: { params: Params }) {
           and(
             eq(jobs.id, jobId),
             eq(jobs.clerkId, session.userId),
-            eq(jobs.status, 'accepted')
+            inArray(jobs.status, ['accepted', 'assigned'])
           )
         )
         .returning({ id: jobs.id })
@@ -69,7 +72,7 @@ export async function POST(req: Request, { params }: { params: Params }) {
         targetType: 'job',
         targetId: jobId,
         payload: {
-          priorStatus: 'accepted',
+          priorStatus: job.status,
           via: 'clerk_self_start',
         },
         ipAddress: ip,
@@ -86,6 +89,7 @@ export async function POST(req: Request, { params }: { params: Params }) {
         `Job is currently '${result.current}', cannot mark in progress`
       )
     }
+    if (result.status === 'blocked') return conflict(result.message)
     if (result.status === 'race') {
       return conflict('Job state changed concurrently : refresh and retry')
     }

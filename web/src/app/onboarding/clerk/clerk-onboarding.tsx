@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/select'
 import { isValidUkPhone } from '@/lib/uk-phone'
 import { createClient } from '@/lib/supabase/client'
+import { PRO_SERVICES, type ProServiceRole } from '@/lib/listd/pro-services'
 
 const STEPS = [
   { label: 'Identity & Profile', icon: User },
@@ -59,6 +60,8 @@ type Props = {
     languages: string[]
   }
   rejectionReason: string | null
+  /** Services the Pro picked at sign-up (each is a role). */
+  initialCategories: ProServiceRole[]
   /** Live service list (built-ins + admin-defined custom types). Resolved
    *  on the server from `getBookableServices(getEffectivePricing())` so the
    *  set the clerk picks from matches the keys the booking flow actually
@@ -76,6 +79,7 @@ export function ClerkOnboarding({
   userId,
   initial,
   rejectionReason,
+  initialCategories,
   serviceOptions,
 }: Props) {
   const validServiceKeys = serviceOptions.map((s) => s.key)
@@ -101,6 +105,8 @@ export function ClerkOnboarding({
   const [services, setServices] = useState<string[]>(() =>
     initial.serviceTypesOffered.filter((v) => validServiceKeys.includes(v))
   )
+  const [categories, setCategories] = useState<ProServiceRole[]>(initialCategories)
+  const inspections = categories.includes('clerk')
   const [languages, setLanguages] = useState<string[]>(initial.languages)
   const [languageInput, setLanguageInput] = useState('')
 
@@ -135,10 +141,11 @@ export function ClerkOnboarding({
       )
     }
     if (step === 1) {
-      return coverageAreas.length > 0 && services.length > 0
+      return coverageAreas.length > 0 && categories.length > 0 && (!inspections || services.length > 0)
     }
     if (step === 2) return dbs.path !== '' && dbsExpiry !== ''
-    if (step === 3) return qualKind !== '' && qualDoc.path !== ''
+    // Formal qualifications are for inspections; other services can skip.
+    if (step === 3) return inspections ? qualKind !== '' && qualDoc.path !== '' : !qualDoc.uploading
     if (step === 4) {
       return (
         insurance.path !== '' &&
@@ -181,6 +188,7 @@ export function ClerkOnboarding({
   }
 
   async function postStep(): Promise<boolean> {
+    if (step === 3 && !inspections && (qualKind === '' || qualDoc.path === '')) return true
     setSubmitting(true)
     try {
       let url: string
@@ -199,7 +207,8 @@ export function ClerkOnboarding({
         url = '/api/onboarding/clerk/coverage'
         body = {
           coverageAreas,
-          serviceTypesOffered: services,
+          categories,
+          serviceTypesOffered: inspections ? services : [],
           ...(languages.length > 0 ? { languages } : {}),
         }
       } else if (step === 2) {
@@ -244,7 +253,7 @@ export function ClerkOnboarding({
       toast.success('Application submitted', {
         description: "We'll review your documents and let you know: usually within 24 hours.",
       })
-      router.push('/clerk/dashboard')
+      router.push('/post-signin')
       router.refresh()
     }
   }
@@ -442,7 +451,29 @@ export function ClerkOnboarding({
                 />
               </FieldGroup>
 
-              <FieldGroup label="Service types offered" required>
+              <FieldGroup label="Services you offer" required>
+                <div className="space-y-2">
+                  {PRO_SERVICES.map((c) => (
+                    <label key={c.role} className="flex cursor-pointer items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={categories.includes(c.role)}
+                        onChange={() =>
+                          setCategories((prev) => (prev.includes(c.role) ? prev.filter((r) => r !== c.role) : [...prev, c.role]))
+                        }
+                        className="mt-0.5 h-4 w-4 rounded border-border accent-primary"
+                      />
+                      <span className="grid">
+                        <span className="text-sm font-medium">{c.label}</span>
+                        <span className="text-xs text-muted-foreground">{c.hint}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </FieldGroup>
+
+              {inspections && (
+              <FieldGroup label="Inspection types you can do" required>
                 <div className="space-y-2">
                   {serviceOptions.map((svc) => (
                     <label
@@ -460,6 +491,7 @@ export function ClerkOnboarding({
                   ))}
                 </div>
               </FieldGroup>
+              )}
 
               <FieldGroup label="Languages spoken">
                 <div className="flex gap-2">
@@ -537,7 +569,12 @@ export function ClerkOnboarding({
                 <h2 className="text-lg font-semibold">Qualifications</h2>
               </div>
 
-              <FieldGroup label="Qualification" required>
+              {!inspections && (
+                <p className="text-xs text-muted-foreground">
+                  Optional for cleaning and repairs. Add any trade or cleaning certificate you hold, or continue.
+                </p>
+              )}
+              <FieldGroup label="Qualification" required={inspections}>
                 <Select value={qualKind} onValueChange={setQualKind}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select your highest qualification" />
@@ -558,7 +595,7 @@ export function ClerkOnboarding({
                 doc={qualDoc}
                 onUpload={(f) => uploadDoc('qualification', f, setQualDoc)}
                 accept="image/*,application/pdf"
-                required
+                required={inspections}
               />
             </CardContent>
           </Card>

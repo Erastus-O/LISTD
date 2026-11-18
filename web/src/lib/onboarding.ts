@@ -25,6 +25,8 @@ export async function bootstrapUser(params: {
   userId: string
   fullName: string
   role: 'client' | 'clerk' | 'cleaner' | 'trades'
+  /** A Pro signs up once and picks services; each becomes a role. */
+  extraRoles?: Array<'clerk' | 'cleaner' | 'trades'>
   /** Privacy Policy version the user agreed to at signup (from user_metadata).
    *  Defaults to the current version when consent is being recorded. */
   privacyPolicyVersion?: string | null
@@ -57,9 +59,10 @@ export async function bootstrapUser(params: {
     }
 
     // Idempotent: user_roles has UNIQUE(user_id, role).
+    const roles = [...new Set([params.role, ...(params.extraRoles ?? [])])]
     await tx
       .insert(userRoles)
-      .values({ userId: params.userId, role: params.role })
+      .values(roles.map((role) => ({ userId: params.userId, role })))
       .onConflictDoNothing()
   })
 

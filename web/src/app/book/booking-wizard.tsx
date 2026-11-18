@@ -430,6 +430,12 @@ export function BookingWizard({
                       <span className="num">{money(l.q * l.u)}</span>
                     </div>
                   ))}
+                  {p.mode === 'pay' && p.bookingFeeP > 0 && (
+                    <div className="mt-1 flex justify-between gap-4 text-sm text-muted-foreground">
+                      <span>Booking fee</span>
+                      <span className="num">{money(p.bookingFeeP)}</span>
+                    </div>
+                  )}
                   {p.reason && <p className="mt-2 text-sm text-muted-foreground">{p.reason.charAt(0).toUpperCase() + p.reason.slice(1)}.</p>}
                 </div>
               ))}

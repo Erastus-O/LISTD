@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { jobs, tenantDetails, type Tx } from '@/db'
 import { logAuditEvent } from '@/lib/audit'
 import type { BookingPlan } from './booking-plan'
-import type { Pricing, ServiceKey } from './pricing'
+import { quoteTotals, type Pricing, type ServiceKey } from './pricing'
 import { issueQuote } from './quotes'
 import type { BookingScope, ServicePlan } from './services'
 
@@ -44,7 +44,10 @@ export async function createBookingJobs(
 
   for (const plan of p.plan.plans) {
     const discP = p.promo?.discountsPence?.get(plan.service) ?? 0
-    const totalP = Math.max(0, plan.totalP - discP)
+    // The booking fee is a share of the job price after any discount.
+    const t = plan.mode === 'pay' ? quoteTotals(pr, plan.lines, discP) : null
+    const totalP = t ? t.totalP : plan.totalP
+    const bookingFeeP = t ? t.bookingFeeP : plan.bookingFeeP
     const status = plan.mode === 'quote' ? 'pending' : p.requirePayment ? 'draft' : 'published'
     const isClean = plan.service === 'CLEANING'
     const feePounds = plan.proFeeP != null ? (plan.proFeeP / 100).toString() : '0'
@@ -81,7 +84,7 @@ export async function createBookingJobs(
       const q = await issueQuote(tx, pr, {
         jobId: job.id,
         lines: plan.lines,
-        proFeeP: plan.proBase ? null : plan.proFeeP,
+        proFeeP: plan.proFeeP,
         durationMin: plan.durationMin,
         discP,
         actorId: null,
@@ -115,7 +118,7 @@ export async function createBookingJobs(
       ipAddress: p.ip ?? undefined,
       userAgent: p.ua ?? undefined,
     })
-    created.push({ jobId: job.id, plan: { ...plan, totalP } })
+    created.push({ jobId: job.id, plan: { ...plan, totalP, bookingFeeP } })
   }
   return created
 }

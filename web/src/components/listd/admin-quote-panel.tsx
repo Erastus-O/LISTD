@@ -5,14 +5,22 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { contribution, linesTotal, repairProFee, type LineTag, type Pricing, type QuoteLine } from '@/lib/listd/pricing'
+import { proNetFor, quoteTotals, type LineTag, type Pricing, type QuoteLine } from '@/lib/listd/pricing'
 
 const money = (p: number) => `£${(p / 100).toFixed(2)}`
 
 type Row = { d: string; pounds: string; q: string; tag: LineTag }
 
 export type AdminQuote = { version: number; status: string; totalP: number; issuedAt: string; why: string | null }
-export type AdminChangeOrder = { id: string; description: string; estimateP: number | null; status: string; totalP: number | null }
+export type AdminChangeOrder = {
+  id: string
+  description: string
+  estimateP: number | null
+  status: string
+  totalP: number | null
+  proFeeP?: number | null
+  evidence?: Array<{ url: string; video: boolean }>
+}
 
 const toRows = (lines: QuoteLine[]): Row[] =>
   lines.map((l) => ({ d: l.d, pounds: (l.u / 100).toFixed(2), q: String(l.q), tag: l.tag }))
@@ -26,11 +34,9 @@ const toLines = (rows: Row[]): QuoteLine[] =>
 export function AdminQuotePanel({
   jobId,
   jobStatus,
-  isRepair,
   pricing,
   current,
   suggested,
-  defaultProFeeP,
   changeOrders,
 }: {
   jobId: string
@@ -49,14 +55,17 @@ export function AdminQuotePanel({
   const [rows, setRows] = useState<Row[]>(
     suggested.length ? toRows(suggested) : [{ d: 'Labour', pounds: '', q: '1', tag: 'svc' }, { d: 'Materials', pounds: '', q: '1', tag: 'materials' }]
   )
-  const [proFee, setProFee] = useState(defaultProFeeP != null ? (defaultProFeeP / 100).toFixed(2) : '')
+  // Empty means the standard net; type a figure only to override it.
+  const [proFee, setProFee] = useState('')
   const [why, setWhy] = useState('')
   const [busy, setBusy] = useState(false)
 
   const lines = toLines(rows)
-  const totalP = linesTotal(lines)
-  const feeP = proFee ? Math.round(Number(proFee) * 100) : isRepair ? repairProFee(pricing, lines) : (defaultProFeeP ?? 0)
-  const c = contribution(pricing, totalP, feeP)
+  const t = quoteTotals(pricing, lines)
+  const totalP = t.totalP
+  // Default: the job price less LISTD's commission. An override is for exceptions.
+  const feeP = proFee ? Math.round(Number(proFee) * 100) : proNetFor(pricing, lines)
+  const listdP = t.totalP - t.taxP - feeP
 
   async function send() {
     setBusy(true)
@@ -138,7 +147,7 @@ export function AdminQuotePanel({
             </button>
           </div>
           <div className="max-w-48">
-            <Label htmlFor="pro-fee">Pro fee (£, hidden from client)</Label>
+            <Label htmlFor="pro-fee">Pro earns (£, hidden from client). Leave blank for the standard {100 - pricing.fees.proPct}%</Label>
             <Input id="pro-fee" className="mt-1.5" inputMode="decimal" value={proFee} placeholder={(feeP / 100).toFixed(2)} onChange={(e) => setProFee(e.target.value)} />
           </div>
           {current && (
@@ -148,12 +157,14 @@ export function AdminQuotePanel({
             </div>
           )}
           <div className="a-summary">
-            <div className="line"><span>Client total</span><b>{money(totalP)}</b></div>
-            <div className="line"><span>Pro fee</span><b>{money(feeP)}</b></div>
-            <div className="line"><span>Payment, operations and rework</span><b>{money(c.costsP)}</b></div>
+            <div className="line"><span>Job price</span><b>{money(t.jobP)}</b></div>
+            <div className="line"><span>Booking fee (client)</span><b>{money(t.bookingFeeP)}</b></div>
+            {t.taxP > 0 && <div className="line"><span>VAT</span><b>{money(t.taxP)}</b></div>}
+            <div className="line"><span>Client pays</span><b>{money(totalP)}</b></div>
+            <div className="line"><span>Pro earns</span><b>{money(feeP)}</b></div>
             <div className="line tot">
-              <span>Contribution</span>
-              <span>{money(c.contribP)} {c.ok ? '· above floor' : '· below floor'}</span>
+              <span>LISTD keeps</span>
+              <span>{money(listdP)}</span>
             </div>
           </div>
           <div className="flex gap-3">
@@ -180,7 +191,22 @@ function ChangeOrderRow({ co, busy, onPrice }: { co: AdminChangeOrder; busy: boo
   const [v, setV] = useState(co.estimateP ? (co.estimateP / 100).toFixed(2) : '')
   return (
     <div className="grid gap-2 border-t border-border pt-3 text-sm">
-      <p><b>Extra work proposed:</b> {co.description}</p>
+      <p><b>Requote from the Pro:</b> {co.description}</p>
+      {co.evidence && co.evidence.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {co.evidence.map((e, i) =>
+            e.video ? (
+              <video key={i} src={e.url} controls className="h-28 rounded-md border border-border" />
+            ) : (
+              <a key={i} href={e.url} target="_blank" rel="noopener noreferrer">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={e.url} alt={`Evidence ${i + 1}`} className="h-28 w-28 rounded-md border border-border object-cover" />
+              </a>
+            )
+          )}
+        </div>
+      )}
+      <p className="a-muted text-xs">Enter the price of the extra work. Both fees are recalculated on the new job total; the client pays the difference and the Pro&apos;s net goes up.</p>
       <div className="flex gap-2">
         <Input aria-label="Price in pounds" className="max-w-32" inputMode="decimal" placeholder="£" value={v} onChange={(e) => setV(e.target.value)} />
         <button type="button" className="ld-btn ld-btn-primary ld-btn-sm" disabled={busy || !Number(v)} onClick={() => onPrice(co.id, v)}>

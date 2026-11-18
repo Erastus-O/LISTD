@@ -1,4 +1,5 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
+import { startBlock } from '@/lib/listd/on-site'
 import { conflict, errorResponse, ok } from '@/lib/api'
 import { authorizeRequest } from '@/lib/dal'
 import { jobs, withServiceRole } from '@/db'
@@ -17,6 +18,8 @@ export async function POST(req: Request, { params }: { params: Params }) {
   try {
     const { jobId } = await params
     const result = await withServiceRole(async (tx) => {
+      const blocked = await startBlock(tx, jobId, session.roles.includes('admin'))
+      if (blocked) return { ok: false as const, message: blocked }
       const updated = await tx
         .update(jobs)
         .set({ status: 'in_progress' })
@@ -24,11 +27,11 @@ export async function POST(req: Request, { params }: { params: Params }) {
           and(
             eq(jobs.id, jobId),
             eq(jobs.cleanerId, session.userId),
-            eq(jobs.status, 'accepted')
+            inArray(jobs.status, ['accepted', 'assigned'])
           )
         )
         .returning({ id: jobs.id })
-      if (updated.length === 0) return { ok: false as const }
+      if (updated.length === 0) return { ok: false as const, message: 'Job is not in an acceptable state to start.' }
 
       await logAuditEvent(tx, {
         category: 'job_lifecycle',
@@ -44,7 +47,7 @@ export async function POST(req: Request, { params }: { params: Params }) {
     })
 
     if (!result.ok) {
-      return conflict('Job is not in an acceptable state to start.')
+      return conflict(result.message)
     }
     return ok({ success: true })
   } catch (err) {

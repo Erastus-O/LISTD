@@ -1,5 +1,6 @@
 import { proEligibility } from '@/lib/listd/pro-levels'
 import 'server-only'
+import { awaitingListd } from '@/lib/listd/job-approval'
 import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm'
 import { db, jobs, profiles, properties } from '@/db'
 import { buildCoverageMatcher } from '@/lib/coverage-radius'
@@ -59,8 +60,7 @@ export async function loadCleanerAvailableJobs(
         preferredTimeSlot: jobs.preferredTimeSlot,
         cleanerPayout: jobs.cleanerPayout,
         quotedPrice: jobs.quotedPrice,
-        specialInstructions: jobs.specialInstructions,
-        createdAt: jobs.createdAt,
+                createdAt: jobs.createdAt,
         postcode: properties.postcode,
         city: properties.city,
         propertyType: properties.propertyType,
@@ -96,7 +96,9 @@ export async function loadCleanerAvailableJobs(
       preferredTimeSlot: r.preferredTimeSlot,
       cleanerPayout: r.cleanerPayout,
       quotedPrice: r.quotedPrice,
-      specialInstructions: r.specialInstructions,
+      // Access instructions can hold key-safe codes: shared only once a Pro is
+      // assigned and LISTD has approved, never on the open job board.
+      specialInstructions: null,
       createdAt: r.createdAt,
       property: {
         postcode: r.postcode,
@@ -174,6 +176,10 @@ export type CleanerJobDetail = {
   scheduledAt: string | null
   cleanerPayout: string | null
   cleanerFinalPayout: string | null
+  /** Accepted, waiting for LISTD: address and access notes stay hidden. */
+  awaitingListd: boolean
+  /** Room counts, for the photo frames. */
+  areaCounts: { bedrooms: number | null; bathrooms: number | null; kitchens: number | null; livingRooms: number | null }
   specialInstructions: string | null
   completion: CleanerCompletion | null
   property: {
@@ -207,6 +213,7 @@ export async function loadCleanerJobDetail(
       cleanerPayout: jobs.cleanerPayout,
       cleanerFinalPayout: jobs.cleanerFinalPayout,
       specialInstructions: jobs.specialInstructions,
+      listdApprovedAt: jobs.listdApprovedAt,
       cleaningChecklist: jobs.cleaningChecklist,
       propertyAddress1: properties.addressLine1,
       propertyAddress2: properties.addressLine2,
@@ -214,6 +221,9 @@ export async function loadCleanerJobDetail(
       propertyPostcode: properties.postcode,
       propertyType: properties.propertyType,
       propertyBedrooms: properties.bedrooms,
+      propertyBathrooms: properties.bathrooms,
+      propertyKitchens: properties.kitchens,
+      propertyLivingRooms: properties.livingRooms,
     })
     .from(jobs)
     .leftJoin(properties, eq(properties.id, jobs.propertyId))
@@ -225,6 +235,7 @@ export async function loadCleanerJobDetail(
   if (!isAdmin && row.cleanerId !== cleanerId) return null
 
   const { cleaning } = await getEffectivePricing()
+  const hidden = !isAdmin && awaitingListd(row)
   return {
     id: row.id,
     level: cleanLevelFromType(row.inspectionType),
@@ -236,12 +247,14 @@ export async function loadCleanerJobDetail(
     scheduledAt: row.scheduledAt,
     cleanerPayout: row.cleanerPayout,
     cleanerFinalPayout: row.cleanerFinalPayout,
-    specialInstructions: row.specialInstructions,
+    awaitingListd: awaitingListd(row),
+    areaCounts: { bedrooms: row.propertyBedrooms, bathrooms: row.propertyBathrooms, kitchens: row.propertyKitchens, livingRooms: row.propertyLivingRooms },
+    specialInstructions: hidden ? null : row.specialInstructions,
     completion: parseCompletion(row.cleaningChecklist),
     property: row.propertyAddress1
       ? {
-          addressLine1: row.propertyAddress1 ?? '',
-          addressLine2: row.propertyAddress2,
+          addressLine1: hidden ? 'Full address shared once LISTD approves' : (row.propertyAddress1 ?? ''),
+          addressLine2: hidden ? null : row.propertyAddress2,
           city: row.propertyCity ?? '',
           postcode: row.propertyPostcode ?? '',
           propertyType: row.propertyType ?? '',

@@ -15,6 +15,8 @@ export const metadata = { title: 'Cleaner verification' }
  */
 export default async function CleanerOnboardingPage() {
   const session = await requireSession()
+  // One Pro onboarding now covers every service.
+  if (!session.roles.includes('admin')) redirect('/onboarding/clerk')
 
   // Non-cleaners land back at the generic onboarding shell.
   if (

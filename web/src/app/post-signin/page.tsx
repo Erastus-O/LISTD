@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/dal'
 import { bootstrapUser } from '@/lib/onboarding'
+import { isPro, isProServiceRole } from '@/lib/listd/pro-services'
 import { createClient } from '@/lib/supabase/server'
 
 type Props = {
@@ -40,7 +41,11 @@ export default async function PostSignin({ searchParams }: Props) {
       typeof user?.user_metadata?.full_name === 'string'
         ? user.user_metadata.full_name
         : ''
-    const rawRole = user?.user_metadata?.role
+    // 'pro' (one sign-up, services ticked) or a legacy single role.
+    const services = Array.isArray(user?.user_metadata?.services)
+      ? (user.user_metadata.services as unknown[]).filter(isProServiceRole)
+      : []
+    const rawRole = user?.user_metadata?.role === 'pro' ? (services[0] ?? 'clerk') : user?.user_metadata?.role
     const privacyPolicyVersion =
       typeof user?.user_metadata?.privacy_policy_version === 'string'
         ? user.user_metadata.privacy_policy_version
@@ -63,6 +68,7 @@ export default async function PostSignin({ searchParams }: Props) {
       userId: session.userId,
       fullName,
       role: rawRole,
+      extraRoles: services,
       privacyPolicyVersion,
       privacyConsentAt,
     })
@@ -92,8 +98,11 @@ export default async function PostSignin({ searchParams }: Props) {
   if (session.roles.includes('admin')) redirect('/admin/dashboard')
   // Restricted SEO-agency seat — their only surface is the meta editor.
   if (session.roles.includes('marketing')) redirect('/admin/seo')
-  if (session.roles.includes('clerk') || session.roles.includes('trades')) redirect('/clerk/dashboard')
-  if (session.roles.includes('cleaner')) redirect('/cleaner/dashboard')
+  // One Pro dashboard, whatever services the Pro offers.
+  // Inspections and repairs live under /clerk, cleaning under /cleaner.
+  if (isPro(session.roles)) {
+    redirect(session.roles.includes('clerk') || session.roles.includes('trades') ? '/clerk/dashboard' : '/cleaner/dashboard')
+  }
 
   // Client surface split: org workers (org_role='worker') get their own
   // /worker/* dashboard; owners + solo clients land on /client.

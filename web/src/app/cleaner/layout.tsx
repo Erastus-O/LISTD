@@ -2,7 +2,8 @@ import { RoleLayoutShell } from '@/components/role/role-layout-shell'
 import { requireRole } from '@/lib/dal'
 import { countUnreadNotifications } from '@/lib/notifications'
 import { SupportChat } from '@/components/assistant/support-chat'
-import { CleanerSidebarNav } from './_components/cleaner-sidebar-nav'
+import { ProSidebarNav } from '@/components/role/pro-sidebar-nav'
+import { proServicesOf } from '@/lib/listd/pro-services'
 
 export default async function CleanerLayout({
   children,
@@ -14,9 +15,9 @@ export default async function CleanerLayout({
   const unreadCount = await countUnreadNotifications(session.userId)
   return (
     <RoleLayoutShell
-      brand="LISTD Pro: Cleaner"
-      brandHref="/cleaner/dashboard"
-      nav={<CleanerSidebarNav />}
+      brand="LISTD Pro"
+      brandHref={proServicesOf(session.roles).some((r) => r !== 'cleaner') ? '/clerk/dashboard' : '/cleaner/dashboard'}
+      nav={<ProSidebarNav services={proServicesOf(session.roles)} />}
       userEmail={session.email}
       userName={session.profile?.fullName ?? null}
       userAvatarUrl={session.profile?.avatarUrl ?? null}

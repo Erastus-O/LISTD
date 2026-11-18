@@ -1,3 +1,4 @@
+import { finishBlock } from '@/lib/listd/on-site'
 import { and, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import {
@@ -175,6 +176,8 @@ export async function POST(req: Request, { params }: { params: Params }) {
       if (job.status !== 'in_progress') {
         return { kind: 'wrong_state' as const, current: job.status }
       }
+      const blocked = await finishBlock(tx, jobId)
+      if (blocked) return { kind: 'blocked' as const, message: blocked }
 
       const [report] = await tx
         .insert(inspectionReports)
@@ -328,6 +331,7 @@ export async function POST(req: Request, { params }: { params: Params }) {
 
     if (persisted.kind === 'not_found') return notFound('Job not found')
     if (persisted.kind === 'forbidden') return forbidden('Not your job')
+    if (persisted.kind === 'blocked') return conflict(persisted.message)
     if (persisted.kind === 'wrong_state') {
       return conflict(
         `Job is currently '${persisted.current}', cannot submit a report`

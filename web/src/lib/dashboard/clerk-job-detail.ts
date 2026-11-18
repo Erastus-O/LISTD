@@ -1,4 +1,5 @@
 import 'server-only'
+import { awaitingListd } from '@/lib/listd/job-approval'
 import { and, asc, desc, eq, inArray, ne } from 'drizzle-orm'
 import {
   db,
@@ -26,6 +27,7 @@ import {
 
 const ALLOWED_STATUSES = [
   'accepted',
+  'assigned',
   'in_progress',
   'submitted',
   'reviewed',
@@ -44,6 +46,10 @@ export type ClerkJobDetail = {
   scheduledAt: string | null
   preferredTimeSlot: string | null
   status: string
+  /** Accepted, waiting for LISTD: address, access details and contacts stay hidden. */
+  awaitingListd: boolean
+  /** Booking details (repair location and category), for the photo frames. */
+  scope: { location?: string | null; category?: string | null } | null
   serviceTier: string
   clerkPayout: string | null
   clerkFinalPayout: string | null
@@ -122,6 +128,8 @@ export async function loadClerkJobDetail(
         clerkFinalPayout: jobs.clerkFinalPayout,
         clerkPayoutBreakdown: jobs.clerkPayoutBreakdown,
         specialInstructions: jobs.specialInstructions,
+        listdApprovedAt: jobs.listdApprovedAt,
+        scope: jobs.scope,
         reportUrl: jobs.reportUrl,
         acceptedAt: jobs.acceptedAt,
         deliveredAt: jobs.deliveredAt,
@@ -148,6 +156,8 @@ export async function loadClerkJobDetail(
     if (!(ALLOWED_STATUSES as readonly string[]).includes(row.status)) {
       return null
     }
+    // Until LISTD approves, the Pro gets the job spec but nothing sensitive.
+    const hidden = !isAdmin && awaitingListd(row)
 
     // Client profile — separate read, no fan-out risk.
     const [clientRow] = row.clientId
@@ -242,7 +252,9 @@ export async function loadClerkJobDetail(
       // Filled by a guarded query after the tx (see below) so a pre-0026
       // database can't break this hot path.
       tenantSlots: [] as string[],
-      specialInstructions: row.specialInstructions,
+      awaitingListd: awaitingListd(row),
+      scope: (row.scope as { location?: string | null; category?: string | null } | null) ?? null,
+      specialInstructions: hidden ? null : row.specialInstructions,
       reportUrl: row.reportUrl,
       acceptedAt: row.acceptedAt,
       deliveredAt: row.deliveredAt,
@@ -250,8 +262,8 @@ export async function loadClerkJobDetail(
       property: row.propertyId
         ? {
             id: row.propertyId,
-            addressLine1: row.propertyAddress1 ?? '',
-            addressLine2: row.propertyAddress2,
+            addressLine1: hidden ? '' : (row.propertyAddress1 ?? ''),
+            addressLine2: hidden ? null : row.propertyAddress2,
             city: row.propertyCity ?? '',
             postcode: row.propertyPostcode ?? '',
             propertyType: row.propertyType,
@@ -260,14 +272,14 @@ export async function loadClerkJobDetail(
             furnishedStatus: row.propertyFurnished,
           }
         : null,
-      client: clientRow
+      client: clientRow && !hidden
         ? {
             userId: clientRow.userId,
             fullName: clientRow.fullName,
             companyName: clientRow.companyName,
           }
         : null,
-      tenants,
+      tenants: hidden ? [] : tenants,
       messages: msgRows,
       previousJobsAtProperty: previousRows.map((p) => ({
         id: p.id,

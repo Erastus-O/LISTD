@@ -1,3 +1,4 @@
+import { finishBlock } from '@/lib/listd/on-site'
 import { and, eq, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { conflict, errorResponse, ok } from '@/lib/api'
@@ -16,7 +17,13 @@ type Params = Promise<{ jobId: string }>
 const RequestSchema = z.object({
   checkedTasks: z.array(z.number().int().min(0).max(100)).max(100),
   notes: z.string().max(2000).optional(),
-  photos: z.array(z.string().min(1).max(500)).max(40).optional(),
+  photos: z.array(z.string().min(1).max(500)).max(200).optional(),
+  // A photo frame per area; every frame the Pro kept needs a photo.
+  areaPhotos: z
+    .array(z.object({ area: z.string().trim().min(1).max(80), paths: z.array(z.string().min(1).max(500)).min(1, 'Add a photo for every area.').max(20) }))
+    .min(1, 'Add photos of the areas you cleaned.')
+    .max(40)
+    .optional(),
 })
 
 /**
@@ -58,6 +65,11 @@ export async function POST(req: Request, { params }: { params: Params }) {
       if (job.status !== 'accepted' && job.status !== 'in_progress') {
         return { state: 'bad_status' as const }
       }
+      const blocked = await finishBlock(tx, jobId, session.roles.includes('admin'))
+      if (blocked) return { state: 'blocked' as const, message: blocked }
+      if (!body.areaPhotos && !session.roles.includes('admin')) {
+        return { state: 'blocked' as const, message: 'Add photos of the areas you cleaned.' }
+      }
 
       // All checklist tasks must be ticked. Type-aware: built-in levels use
       // the code checklists; admin-defined offerings carry theirs in the
@@ -85,7 +97,8 @@ export async function POST(req: Request, { params }: { params: Params }) {
           cleaningChecklist: {
             checkedTasks: Array.from(checked).sort((a, b) => a - b),
             notes: body.notes ?? '',
-            photos: body.photos ?? [],
+            photos: body.areaPhotos ? body.areaPhotos.flatMap((f) => f.paths) : (body.photos ?? []),
+            areaPhotos: body.areaPhotos ?? [],
             completedAt,
           },
         })
@@ -141,6 +154,7 @@ export async function POST(req: Request, { params }: { params: Params }) {
         { status: 400 }
       )
     }
+    if (result.state === 'blocked') return conflict(result.message)
     if (result.state === 'bad_status') {
       return conflict('Job is not in a completable state.')
     }

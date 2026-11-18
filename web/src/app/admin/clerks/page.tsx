@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { eq, inArray } from 'drizzle-orm'
+import { inArray } from 'drizzle-orm'
 import { Eye } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -49,6 +49,12 @@ const LEVEL_TONE: Record<
 
 const EXPIRY_WINDOW_DAYS = 30
 
+const SERVICE_OF_ROLE: Record<string, string> = {
+  clerk: 'Inspections',
+  cleaner: 'Cleaning',
+  trades: 'Repairs',
+}
+
 type Search = Promise<{
   q?: string
   level?: string
@@ -84,13 +90,16 @@ export default async function AdminClerksPage({
   // round-trip; filters and pagination happen in JS since the volume of
   // clerks per Pro deployment is small (hundreds, not millions).
   const rows = await withServiceRole(async (tx) => {
-    const clerkIds = await tx
-      .select({ userId: userRoles.userId })
+    // Every Pro, whatever services they offer: inspections, cleaning, trades.
+    const proRoles = await tx
+      .select({ userId: userRoles.userId, role: userRoles.role })
       .from(userRoles)
-      .where(eq(userRoles.role, 'clerk'))
-    if (clerkIds.length === 0) return []
-    const ids = Array.from(new Set(clerkIds.map((r) => r.userId)))
-    return tx
+      .where(inArray(userRoles.role, ['clerk', 'cleaner', 'trades']))
+    if (proRoles.length === 0) return []
+    const servicesBy = new Map<string, string[]>()
+    for (const r of proRoles) servicesBy.set(r.userId, [...(servicesBy.get(r.userId) ?? []), SERVICE_OF_ROLE[r.role] ?? r.role])
+    const ids = [...servicesBy.keys()]
+    const found = await tx
       .select({
         userId: profiles.userId,
         fullName: profiles.fullName,
@@ -104,6 +113,7 @@ export default async function AdminClerksPage({
       })
       .from(profiles)
       .where(inArray(profiles.userId, ids))
+    return found.map((p) => ({ ...p, services: servicesBy.get(p.userId) ?? [] }))
   })
 
   const filtered = rows.filter((c) => {
@@ -135,20 +145,20 @@ export default async function AdminClerksPage({
     <div className="w-full space-y-6 px-6 py-10">
       <div>
         <h1 className="font-display text-3xl text-foreground">
-          Clerk Management
+          Pro Management
         </h1>
       </div>
 
       <AdminClerksSearch />
 
       <p className="text-xs text-muted-foreground">
-        {filtered.length} {filtered.length === 1 ? 'clerk' : 'clerks'}
+        {filtered.length} {filtered.length === 1 ? 'Pro' : 'Pros'}
       </p>
 
       {filtered.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-sm text-muted-foreground">
-            No clerks match this filter.
+            No Pros match this filter.
           </CardContent>
         </Card>
       ) : (
@@ -159,6 +169,7 @@ export default async function AdminClerksPage({
                 <thead className="border-b border-border bg-muted/30 text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th className="px-4 py-2.5 text-left font-medium">Name</th>
+                    <th className="px-4 py-2.5 text-left font-medium">Services</th>
                     <th className="px-4 py-2.5 text-left font-medium">Badge</th>
                     <th className="px-4 py-2.5 text-left font-medium">Region</th>
                     <th className="px-4 py-2.5 text-right font-medium">Jobs</th>
@@ -182,6 +193,9 @@ export default async function AdminClerksPage({
                           >
                             {c.fullName ?? '—'}
                           </Link>
+                        </td>
+                        <td className="px-4 py-2.5 text-xs">
+                          {c.services.join(', ')}
                         </td>
                         <td className="px-4 py-2.5">
                           <Badge variant={LEVEL_TONE[level] ?? 'outline'}>

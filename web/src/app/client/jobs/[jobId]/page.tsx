@@ -40,6 +40,9 @@ import { formatUkTime } from '@/lib/scheduling/exact-time'
 import { ClientJobActions } from '@/components/listd/client-job-actions'
 import { ProgressRail, ServiceTag, StatusPill } from '@/components/listd/job-status'
 import { loadClientJobActions } from '@/lib/listd/client-job'
+import { JobThread } from '@/components/listd/job-thread'
+import { loadThread } from '@/lib/listd/job-messages'
+import { getProWorkflow } from '@/lib/listd/pro-workflow'
 
 export const metadata = { title: 'Client · Job detail' }
 export const dynamic = 'force-dynamic'
@@ -73,6 +76,8 @@ export default async function ClientJobDetailPage({ params }: Props) {
   const job = await loadClientJobDetail(jobId, session.userId)
   if (!job) notFound()
   const actions = await loadClientJobActions(job.id)
+  const workflow = await getProWorkflow()
+  const clientThread = workflow.clientChat ? await loadThread(job.id, 'client', session.roles.includes('admin') ? 'listd' : 'client') : []
 
   const stepperIndex = getStepperIndex(job.status)
   const refSlug = job.id.slice(0, 8)
@@ -178,6 +183,17 @@ export default async function ClientJobDetailPage({ params }: Props) {
         quote={actions.quote}
         changeOrders={actions.changeOrders}
       />
+      {workflow.clientChat && (
+        <JobThread
+          jobId={job.id}
+          channel="client"
+          me={session.roles.includes('admin') ? 'listd' : 'client'}
+          title="Messages with LISTD"
+          hint="LISTD manages your booking and talks to the Pro for you."
+          messages={clientThread}
+          disabled={['completed', 'paid', 'cancelled'].includes(job.status)}
+        />
+      )}
 
 
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">

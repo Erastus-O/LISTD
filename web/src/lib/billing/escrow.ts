@@ -213,7 +213,7 @@ export async function createEscrowCheckoutForJobs(params: {
     clerkPounds: number
     description: string
   }>
-}): Promise<{ url: string; escrowIds: string[] }> {
+}): Promise<{ url: string; escrowIds: string[]; sessionId: string }> {
   const stripe = await getStripe()
   const origin = getSiteOrigin()
   const items = params.items.map((i) => {
@@ -296,7 +296,7 @@ export async function createEscrowCheckoutForJobs(params: {
     sessionId: session.id,
     grossPence: items.reduce((a, i) => a + i.gross, 0),
   })
-  return { url: session.url, escrowIds }
+  return { url: session.url, escrowIds, sessionId: session.id }
 }
 
 /** Single-job form, kept for callers that book one service. */
@@ -454,6 +454,12 @@ export async function fulfilEscrowCheckout(
       .returning({ jobId: escrowTransactions.jobId })
     const jobIds = held.map((h) => h.jobId)
     if (!jobIds.length) return []
+    // A checkout for approved extra work: the change order is now paid.
+    await tx.execute(sql`
+      update change_orders
+         set status = 'PAID', paid_at = now(), stripe_charge_id = ${chargeId}
+       where stripe_checkout_session_id = ${session.id} and status = 'APPROVED'
+    `)
     // Only the first webhook delivery flips draft → published; Stripe retries
     // affect zero rows. `returning` lets us notify providers exactly once.
     const flipped = await tx
@@ -518,6 +524,19 @@ export async function recordEscrowChargeFromPI(
  * still succeeds and the payout can be retried.
  */
 export async function releaseEscrowForJob(
+  jobId: string
+): Promise<{ released: boolean; reason?: string; transferId?: string }> {
+  // A job can hold more than one payment: the booking and any paid extra work.
+  let first: { released: boolean; reason?: string; transferId?: string } | null = null
+  for (let i = 0; i < 10; i++) {
+    const r = await releaseOneEscrowForJob(jobId)
+    first ??= r
+    if (!r.released) break
+  }
+  return first ?? { released: false, reason: 'no_held_escrow' }
+}
+
+async function releaseOneEscrowForJob(
   jobId: string
 ): Promise<{ released: boolean; reason?: string; transferId?: string }> {
   try {
@@ -590,7 +609,6 @@ export async function releaseEscrowForJob(
       { idempotencyKey: `release_${escrow.id}` }
     )
 
-    const paidPounds = String(escrow.clerkAmount / 100)
     await withServiceRole(async (tx) => {
       await tx
         .update(escrowTransactions)
@@ -609,7 +627,13 @@ export async function releaseEscrowForJob(
         )
       // Reflect the payout on the job so the worker's earnings flip from
       // "Pending" to "Paid": stamp the payment date + finalised payout on the
-      // right (clerk vs cleaner) columns.
+      // right (clerk vs cleaner) columns. The total of every released payment,
+      // so paid extra work adds to the booking rather than replacing it.
+      const [{ total }] = await tx
+        .select({ total: sql<number>`coalesce(sum(${escrowTransactions.clerkAmount}), 0)::int` })
+        .from(escrowTransactions)
+        .where(and(eq(escrowTransactions.jobId, jobId), eq(escrowTransactions.status, 'released')))
+      const paidPounds = String(total / 100)
       await tx
         .update(jobs)
         .set(

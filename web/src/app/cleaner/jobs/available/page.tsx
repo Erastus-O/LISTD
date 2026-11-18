@@ -83,11 +83,9 @@ export default async function CleanerAvailableJobsPage() {
                     {formatDate(job.scheduledDate)}
                     {job.preferredTimeSlot ? ` · ${job.preferredTimeSlot}` : ''}
                   </div>
-                  {job.specialInstructions && (
-                    <p className="rounded-md border border-border bg-muted/30 p-2 text-xs text-muted-foreground">
-                      {job.specialInstructions}
-                    </p>
-                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Full address, access codes and the job brief are sent once LISTD approves your booking.
+                  </p>
                   <div className="flex items-center justify-between pt-1">
                     <span className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Clock className="h-3 w-3" />

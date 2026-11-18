@@ -5,6 +5,8 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import type { ProRole } from '@/lib/listd/pricing'
+import { AreaPhotoFrames } from '@/components/listd/area-photo-frames'
+import { framesComplete, type AreaPhotos } from '@/lib/listd/area-frames'
 
 export type RoleSummary = {
   role: ProRole
@@ -221,19 +223,18 @@ export function TrainingList({ items }: { items: TrainingRow[] }) {
   )
 }
 
-/** Trades: finish a repair. */
-export function RepairCompletePanel({ jobId }: { jobId: string }) {
+/** Trades: finish a repair, with photos of the area worked on. Extra work goes through the requote panel. */
+export function RepairCompletePanel({ jobId, areas }: { jobId: string; areas: string[] }) {
   const router = useRouter()
   const [notes, setNotes] = useState('')
-  const [extra, setExtra] = useState('')
-  const [estimate, setEstimate] = useState('')
+  const [frames, setFrames] = useState<AreaPhotos[]>(() => areas.map((area) => ({ area, paths: [] })))
   const [busy, setBusy] = useState(false)
-  async function run(fn: () => Promise<unknown>, done: string, reset: () => void) {
+  const done = framesComplete(frames)
+  async function submit() {
     setBusy(true)
     try {
-      await fn()
-      toast.success(done)
-      reset()
+      await post(`/api/clerk/jobs/${jobId}/complete-repair`, { notes, areaPhotos: frames })
+      toast.success('Sent to LISTD for review')
       router.refresh()
     } catch (err) {
       toast.error('Not sent', { description: err instanceof Error ? err.message : undefined })
@@ -245,26 +246,16 @@ export function RepairCompletePanel({ jobId }: { jobId: string }) {
     <div className="a-card grid gap-4">
       <h2 className="text-base font-semibold">Repair report</h2>
       <div className="grid gap-2">
+        <p className="text-sm font-medium">Photos of the area</p>
+        <p className="text-xs text-muted-foreground">At least one photo in each frame. Remove any that do not apply, or add another area.</p>
+        <AreaPhotoFrames jobId={jobId} prefix="repair" frames={frames} onChange={setFrames} />
+      </div>
+      <div className="grid gap-2">
         <label className="text-sm font-medium" htmlFor="repair-notes">What did you find and do?</label>
         <textarea id="repair-notes" rows={4} className="w-full rounded-md border border-input bg-transparent p-3 text-sm" value={notes} onChange={(e) => setNotes(e.target.value)} />
         <div>
-          <button type="button" className="ld-btn ld-btn-primary" disabled={busy || notes.trim().length < 3} onClick={() => run(() => post(`/api/clerk/jobs/${jobId}/complete-repair`, { notes }), 'Sent to LISTD for review', () => setNotes(''))}>
-            Submit repair report
-          </button>
-        </div>
-      </div>
-      <div className="grid gap-2 border-t border-border pt-4">
-        <label className="text-sm font-medium" htmlFor="extra">Found extra work? It needs the client’s approval before you start.</label>
-        <input id="extra" className="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm" placeholder="What’s needed" value={extra} onChange={(e) => setExtra(e.target.value)} />
-        <input aria-label="Your estimate in pounds" className="h-10 max-w-40 rounded-md border border-input bg-transparent px-3 text-sm" inputMode="decimal" placeholder="Estimate £" value={estimate} onChange={(e) => setEstimate(e.target.value)} />
-        <div>
-          <button
-            type="button"
-            className="ld-btn ld-btn-secondary"
-            disabled={busy || extra.trim().length < 3}
-            onClick={() => run(() => post('/api/pro/change-orders', { jobId, description: extra, estimateP: estimate ? Math.round(Number(estimate) * 100) : undefined }), 'Sent to LISTD to price', () => { setExtra(''); setEstimate('') })}
-          >
-            Propose extra work
+          <button type="button" className="ld-btn ld-btn-primary" disabled={busy || notes.trim().length < 3 || !done} onClick={submit}>
+            {done ? 'Submit repair report' : 'Add a photo for each area'}
           </button>
         </div>
       </div>

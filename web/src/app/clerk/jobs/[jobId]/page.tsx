@@ -15,6 +15,10 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { requireRole } from '@/lib/dal'
+import { JobThread } from '@/components/listd/job-thread'
+import { RequotePanel } from '@/components/listd/requote-panel'
+import { repairAreas } from '@/lib/listd/area-frames'
+import { loadThread } from '@/lib/listd/job-messages'
 import {
   loadClerkJobDetail,
   type ClerkJobDetail,
@@ -95,7 +99,7 @@ export default async function ClerkJobDetailPage({ params }: Props) {
 
   // Calendar links — same shape as the client variant. Suppressed for
   // closed jobs (no point adding a past inspection to your cal).
-  const calendarSchedule = !isClosed
+  const calendarSchedule = !isClosed && !job.awaitingListd
     ? resolveJobSchedule({
         scheduledAt: job.scheduledAt,
         scheduledDate: job.scheduledDate,
@@ -130,11 +134,14 @@ export default async function ClerkJobDetailPage({ params }: Props) {
       })
     : null
   const calendarIcsUrl = `/api/calendar/job/${job.id}`
+  const thread = await loadThread(job.id, 'pro', isAdmin ? 'listd' : 'pro')
 
   // On-site events (0038) — arrival / running-late / no-access drive the
   // On-site card while the job is live. Defensive fallback for a DB that
   // hasn't run the migration yet (0033 precedent).
-  const isOnSitePhase = ['accepted', 'assigned', 'in_progress'].includes(
+  // Nothing on site until LISTD approves the booking.
+  const waiting = job.awaitingListd
+  const isOnSitePhase = !waiting && ['accepted', 'assigned', 'in_progress'].includes(
     job.status
   )
   const siteEvents: SiteEventSummary[] = isOnSitePhase
@@ -178,31 +185,46 @@ export default async function ClerkJobDetailPage({ params }: Props) {
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         {/* LEFT */}
         <div className="space-y-6">
+          {waiting && (
+            <Card className="border-primary/30 bg-primary/5">
+              <CardContent className="space-y-1 p-4">
+                <p className="text-sm font-medium text-foreground">Waiting for LISTD approval</p>
+                <p className="text-xs text-muted-foreground">
+                  LISTD checks every booking during the beta. Once it&apos;s approved you&apos;ll get the full address, access codes, contacts and the job brief here and by email.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
           {/* On-site: check in / running late / no access */}
           {isOnSitePhase && (
             <SiteActionsCard
               jobId={job.id}
               apiBase="/api/clerk"
               initialEvents={siteEvents}
+              status={job.status}
             />
           )}
 
           {/* Repairs have their own report, not the inspection editor. */}
-          {String(job.inspectionType) === 'repairs' &&
-            ['accepted', 'assigned', 'in_progress'].includes(job.status) && (
-              <RepairCompletePanel jobId={job.id} />
+          {String(job.inspectionType) === 'repairs' && !waiting &&
+            job.status === 'in_progress' && (
+              <RepairCompletePanel jobId={job.id} areas={repairAreas(job.scope)} />
             )}
 
+          {/* Extra work found on site: requote with evidence, the client decides. */}
+          {!waiting && ['accepted', 'assigned', 'in_progress'].includes(job.status) && <RequotePanel jobId={job.id} />}
+
           {/* Status-aware action */}
-          {job.status === 'accepted' && String(job.inspectionType) !== 'repairs' && (
+          {!waiting && ['accepted', 'assigned'].includes(job.status) && (
             <Card className="border-primary/30 bg-primary/5">
               <CardContent className="flex items-center justify-between gap-3 p-4">
                 <div>
                   <p className="text-sm font-medium text-foreground">
-                    Ready to start the inspection?
+                    {String(job.inspectionType) === 'repairs' ? 'Ready to start the repair?' : 'Ready to start the inspection?'}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Mark as in progress when you begin on-site.
+                    Check in with a photo of the front of the building, then mark as in progress.
                   </p>
                 </div>
                 <MarkInProgressButton jobId={job.id} />
@@ -210,7 +232,7 @@ export default async function ClerkJobDetailPage({ params }: Props) {
             </Card>
           )}
 
-          {job.status === 'in_progress' && (
+          {job.status === 'in_progress' && String(job.inspectionType) !== 'repairs' && (
             <Card className="border-primary/30 bg-primary/5">
               <CardContent className="flex items-center justify-between gap-3 p-4">
                 <div>
@@ -241,7 +263,7 @@ export default async function ClerkJobDetailPage({ params }: Props) {
                   <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-foreground">
-                      {job.property.addressLine1}
+                      {waiting ? 'Full address shared once LISTD approves' : job.property.addressLine1}
                     </p>
                     {job.property.addressLine2 && (
                       <p className="text-xs text-muted-foreground">
@@ -480,17 +502,16 @@ export default async function ClerkJobDetailPage({ params }: Props) {
             </Card>
           )}
 
-          {/* Messages */}
-          <Card>
-            <CardContent className="space-y-3 p-6">
-              <h2 className="text-base font-semibold">Messages</h2>
-              <MessagesPanel
-                messages={job.messages}
-                userId={session.userId}
-                isClosed={isClosed}
-              />
-            </CardContent>
-          </Card>
+          {/* Messages: the Pro talks to LISTD only; LISTD relays to the client. */}
+          <JobThread
+            jobId={job.id}
+            channel="pro"
+            me={isAdmin ? 'listd' : 'pro'}
+            title="Messages with LISTD"
+            hint="Questions, access problems or anything the client needs to know. LISTD passes it on."
+            messages={thread}
+            disabled={isClosed}
+          />
         </div>
       </div>
     </div>
@@ -514,55 +535,6 @@ function DetailRow({
         <div className="text-sm font-medium text-foreground">{children}</div>
       </div>
     </div>
-  )
-}
-
-function MessagesPanel({
-  messages,
-  userId,
-  isClosed,
-}: {
-  messages: ClerkJobDetail['messages']
-  userId: string
-  isClosed: boolean
-}) {
-  if (messages.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        {isClosed ? 'No messages on this job.' : 'No messages yet.'}
-      </p>
-    )
-  }
-  return (
-    <>
-      <div className="max-h-[320px] space-y-2 overflow-y-auto">
-        {messages.map((msg) => {
-          const isMine = msg.senderId === userId
-          return (
-            <div
-              key={msg.id}
-              className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}
-            >
-              <div
-                className={`max-w-[75%] rounded-lg px-3 py-2 text-sm ${
-                  isMine
-                    ? 'bg-primary/10 text-foreground'
-                    : 'bg-muted text-foreground'
-                }`}
-              >
-                <p>{msg.messageText}</p>
-                <p className="mt-1 text-[10px] text-muted-foreground">
-                  {formatDateTime(msg.createdAt)}
-                </p>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-      <p className="text-[11px] text-muted-foreground">
-        Send-message UI ports with the messaging surface.
-      </p>
-    </>
   )
 }
 

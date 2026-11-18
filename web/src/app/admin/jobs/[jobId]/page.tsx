@@ -37,6 +37,11 @@ import { getCleaningChecklistForType } from '@/lib/cleaning/checklists'
 import { AdminJobActions } from './admin-job-actions'
 import { AdminNotesEditor } from '@/components/admin/admin-notes-editor'
 import { AdminQuotePanel } from '@/components/listd/admin-quote-panel'
+import { AdminApprovalPanel } from '@/components/listd/admin-approval-panel'
+import { JobThread } from '@/components/listd/job-thread'
+import { loadApprovalInfo } from '@/lib/listd/job-approval'
+import { loadThread } from '@/lib/listd/job-messages'
+import { getProWorkflow } from '@/lib/listd/pro-workflow'
 import { loadAdminQuotePanel } from '@/lib/listd/client-job'
 import { CleaningSignoffActions } from './cleaning-signoff'
 import { EditablePrice } from './editable-price'
@@ -92,6 +97,12 @@ export default async function AdminJobDetailPage({ params }: Props) {
   // Cleaning sign-off: a clean the cleaner has finished sits in `submitted`
   // until an admin approves it (which releases the cleaner's payout).
   const quotePanel = await loadAdminQuotePanel(job.id)
+  const [approval, proThread, clientThread, workflow] = await Promise.all([
+    loadApprovalInfo(job.id),
+    loadThread(job.id, 'pro', 'listd'),
+    loadThread(job.id, 'client', 'listd'),
+    getProWorkflow(),
+  ])
   const isClean = isCleaningType(job.inspectionType)
   const isRepair = String(job.inspectionType) === 'repairs'
   const awaitingCleanSignoff = (isClean || isRepair) && job.status === 'submitted'
@@ -123,6 +134,30 @@ export default async function AdminJobDetailPage({ params }: Props) {
         <span className="text-sm text-muted-foreground">
           {inspectionLabel} · {tierLabel}
         </span>
+      </div>
+
+      {approval && <AdminApprovalPanel jobId={job.id} pro={approval.pro} acceptedAt={approval.acceptedAt} netP={approval.netP} />}
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <JobThread
+          jobId={job.id}
+          channel="pro"
+          me="listd"
+          title="Messages with the Pro"
+          hint="The Pro only talks to LISTD. Relay anything the client needs to know."
+          messages={proThread}
+        />
+        {(workflow.clientChat || clientThread.length > 0) && (
+          <JobThread
+            jobId={job.id}
+            channel="client"
+            me="listd"
+            title="Messages with the client"
+            hint={workflow.clientChat ? undefined : 'Client chat is switched off in Settings.'}
+            messages={clientThread}
+            disabled={!workflow.clientChat}
+          />
+        )}
       </div>
 
       <AdminQuotePanel

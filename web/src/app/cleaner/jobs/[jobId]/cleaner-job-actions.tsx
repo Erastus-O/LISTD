@@ -2,12 +2,13 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Camera, Check, CheckCircle2, Clock, Loader2, Play, X } from 'lucide-react'
+import { Check, CheckCircle2, Clock, Loader2, Play } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
-import { createClient } from '@/lib/supabase/client'
+import { AreaPhotoFrames } from '@/components/listd/area-photo-frames'
+import { framesComplete, type AreaPhotos } from '@/lib/listd/area-frames'
 import type { CleanerCompletion } from '@/lib/dashboard/cleaner-jobs'
 
 type Props = {
@@ -15,15 +16,16 @@ type Props = {
   status: string
   tasks: string[]
   completion: CleanerCompletion | null
+  /** Photo frames to start from: every area of the property. */
+  areas: string[]
 }
 
-export function CleanerJobActions({ jobId, status, tasks, completion }: Props) {
+export function CleanerJobActions({ jobId, status, tasks, completion, areas }: Props) {
   const router = useRouter()
   const [pending, setPending] = useState(false)
   const [checked, setChecked] = useState<Set<number>>(new Set())
   const [notes, setNotes] = useState('')
-  const [photos, setPhotos] = useState<string[]>([])
-  const [uploading, setUploading] = useState(false)
+  const [frames, setFrames] = useState<AreaPhotos[]>(() => areas.map((area) => ({ area, paths: [] })))
 
   // ── Completed / paid: read-only summary ──────────────────────────────────
   if (status === 'completed' || status === 'paid') {
@@ -151,34 +153,11 @@ export function CleanerJobActions({ jobId, status, tasks, completion }: Props) {
     })
   }
 
-  async function uploadPhoto(file: File) {
-    if (file.size > 12 * 1024 * 1024) {
-      toast.error('File too large', { description: 'Max 12 MB.' })
-      return
-    }
-    setUploading(true)
-    try {
-      const supabase = createClient()
-      const ext = file.name.split('.').pop() ?? 'jpg'
-      const path = `${jobId}/clean_${Date.now()}.${ext}`
-      const { error } = await supabase.storage
-        .from('job-photos')
-        .upload(path, file, { upsert: true, contentType: file.type })
-      if (error) throw error
-      setPhotos((p) => [...p, path])
-    } catch (err) {
-      toast.error('Upload failed', {
-        description: err instanceof Error ? err.message : 'Please try again.',
-      })
-    } finally {
-      setUploading(false)
-    }
-  }
-
   const allChecked = checked.size >= tasks.length
+  const photosDone = framesComplete(frames)
 
   async function complete() {
-    if (pending || !allChecked) return
+    if (pending || !allChecked || !photosDone) return
     setPending(true)
     try {
       const res = await fetch(`/api/cleaner/jobs/${jobId}/complete`, {
@@ -187,7 +166,8 @@ export function CleanerJobActions({ jobId, status, tasks, completion }: Props) {
         body: JSON.stringify({
           checkedTasks: Array.from(checked),
           notes: notes.trim() || undefined,
-          photos: photos.length > 0 ? photos : undefined,
+          areaPhotos: frames,
+          photos: frames.flatMap((f) => f.paths),
         }),
       })
       if (!res.ok) {
@@ -236,46 +216,11 @@ export function CleanerJobActions({ jobId, status, tasks, completion }: Props) {
         </ul>
 
         <div className="border-t border-border pt-4">
-          <p className="mb-2 text-sm font-medium">Photos (optional)</p>
-          {photos.length > 0 && (
-            <div className="mb-2 flex flex-wrap gap-2">
-              {photos.map((p, i) => (
-                <span
-                  key={p}
-                  className="inline-flex items-center gap-1 rounded-full bg-secondary px-3 py-1 text-xs"
-                >
-                  Photo {i + 1}
-                  <button
-                    type="button"
-                    onClick={() => setPhotos((ps) => ps.filter((x) => x !== p))}
-                    className="text-muted-foreground hover:text-foreground"
-                    aria-label="Remove photo"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-          <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm hover:bg-muted">
-            {uploading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Camera className="h-4 w-4" />
-            )}
-            <span>{uploading ? 'Uploading…' : 'Add photo'}</span>
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              disabled={uploading}
-              onChange={(e) => {
-                const f = e.target.files?.[0]
-                if (f) uploadPhoto(f)
-                e.target.value = ''
-              }}
-            />
-          </label>
+          <p className="text-sm font-medium">Photos of every area</p>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Add at least one photo for each area you cleaned. Remove any area that isn&apos;t part of this clean.
+          </p>
+          <AreaPhotoFrames jobId={jobId} prefix="clean" frames={frames} onChange={setFrames} />
         </div>
 
         <Textarea
@@ -288,7 +233,7 @@ export function CleanerJobActions({ jobId, status, tasks, completion }: Props) {
 
         <Button
           onClick={complete}
-          disabled={!allChecked || pending || uploading}
+          disabled={!allChecked || !photosDone || pending}
           className="w-full gap-1.5"
         >
           {pending ? (
@@ -296,9 +241,11 @@ export function CleanerJobActions({ jobId, status, tasks, completion }: Props) {
           ) : (
             <CheckCircle2 className="h-4 w-4" />
           )}
-          {allChecked
-            ? 'Complete clean'
-            : `Tick all tasks (${checked.size}/${tasks.length})`}
+          {!allChecked
+            ? `Tick all tasks (${checked.size}/${tasks.length})`
+            : !photosDone
+              ? 'Add a photo for each area'
+              : 'Complete clean'}
         </Button>
       </CardContent>
     </Card>

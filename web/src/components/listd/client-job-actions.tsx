@@ -12,13 +12,25 @@ const money = (p: number) => `£${(p / 100).toFixed(2)}`
 export type ClientQuote = {
   version: number
   lines: QuoteLine[]
+  discP: number
+  taxP: number
+  bookingFeeP: number
   totalP: number
   why: string | null
   expiresAt: string | null
   exclusions: string | null
 }
 
-export type ClientChangeOrder = { id: string; description: string; totalP: number | null; creditP: number; status: string }
+export type ClientChangeOrder = {
+  id: string
+  description: string
+  /** What the client pays for it: the extra work plus the change in booking fee. */
+  totalP: number | null
+  creditP: number
+  status: string
+  /** Signed links to the Pro's photos and videos. */
+  evidence?: Array<{ url: string; video: boolean }>
+}
 
 async function post(url: string, body?: unknown) {
   const res = await fetch(url, {
@@ -86,6 +98,23 @@ export function ClientJobActions({
   }
 
   const priced = changeOrders.filter((c) => c.status === 'PRICED')
+
+  async function approveExtra(id: string) {
+    setBusy(true)
+    try {
+      const json = await post(`/api/client/change-orders/${id}`, { approve: true })
+      if (json.checkoutUrl) {
+        window.location.assign(json.checkoutUrl)
+        return
+      }
+      toast.success('Extra work approved')
+      router.refresh()
+    } catch (err) {
+      toast.error('That didn’t work', { description: err instanceof Error ? err.message : 'Please try again.' })
+    } finally {
+      setBusy(false)
+    }
+  }
   const showQuote = status === 'pending' && quote
   const waitingForQuote = status === 'pending' && !quote
   const canApprove = status === 'reviewed'
@@ -114,6 +143,24 @@ export function ClientJobActions({
                 <b>{money(l.q * l.u)}</b>
               </div>
             ))}
+            {quote.discP > 0 && (
+              <div className="line">
+                <span>Discount</span>
+                <b>−{money(quote.discP)}</b>
+              </div>
+            )}
+            {quote.bookingFeeP > 0 && (
+              <div className="line">
+                <span>Booking fee</span>
+                <b>{money(quote.bookingFeeP)}</b>
+              </div>
+            )}
+            {quote.taxP > 0 && (
+              <div className="line">
+                <span>VAT</span>
+                <b>{money(quote.taxP)}</b>
+              </div>
+            )}
             <div className="line tot">
               <span>Total</span>
               <span>{money(quote.totalP)}</span>
@@ -191,13 +238,28 @@ export function ClientJobActions({
         <div key={c.id} className="grid gap-2 border-t border-border pt-4 first:border-t-0 first:pt-0">
           <h2 className="text-lg font-semibold">Extra work needs your approval</h2>
           <p className="text-sm">{c.description}</p>
+          {c.evidence && c.evidence.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {c.evidence.map((e, i) =>
+                e.video ? (
+                  <video key={i} src={e.url} controls className="h-32 rounded-md border border-border" />
+                ) : (
+                  <a key={i} href={e.url} target="_blank" rel="noopener noreferrer">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={e.url} alt={`Evidence ${i + 1}`} className="h-32 w-32 rounded-md border border-border object-cover" />
+                  </a>
+                )
+              )}
+            </div>
+          )}
           <p className="text-sm font-semibold">
-            {money(c.totalP ?? 0)}
-            {c.creditP ? <span className="a-muted font-normal"> after your {money(c.creditP)} diagnosis credit</span> : null}
+            Extra cost {money(c.totalP ?? 0)}
+            <span className="a-muted font-normal"> including the booking fee{c.creditP ? `, after your ${money(c.creditP)} diagnosis credit` : ''}</span>
           </p>
+          <p className="a-muted text-sm">If you decline, the job is finished as originally booked.</p>
           <div className="flex flex-wrap gap-3">
-            <button type="button" className="ld-btn ld-btn-primary" disabled={busy} onClick={() => run(() => post(`/api/client/change-orders/${c.id}`, { approve: true }), 'Extra work approved')}>
-              Approve
+            <button type="button" className="ld-btn ld-btn-primary" disabled={busy} onClick={() => approveExtra(c.id)}>
+              Approve and pay {money(c.totalP ?? 0)}
             </button>
             <button type="button" className="ld-btn ld-btn-secondary" disabled={busy} onClick={() => run(() => post(`/api/client/change-orders/${c.id}`, { approve: false }), 'Extra work declined')}>
               Decline

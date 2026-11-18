@@ -210,14 +210,9 @@ export function JobDetailsModal({ data }: { data: JobDetailsModalData }) {
           </div>
         )}
 
-        {data.specialInstructions && (
-          <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs leading-relaxed">
-            <p className="font-medium text-foreground">Special Notes</p>
-            <p className="mt-1 text-muted-foreground">
-              {data.specialInstructions}
-            </p>
-          </div>
-        )}
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          Full address, access codes and the job brief are sent once LISTD approves your booking.
+        </p>
 
         <div className="space-y-1.5">
           <Label className="text-xs">Your arrival time</Label>

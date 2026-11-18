@@ -55,7 +55,17 @@ const SiteEventSchema = z.discriminatedUnion('kind', [
     .object({
       kind: z.literal('arrival'),
       note: z.string().trim().max(2000).optional(),
-      photoPaths: z.array(z.string().min(1).max(500)).max(5).optional(),
+      // A photo of the front of the building is required to check in.
+      photoPaths: z.array(z.string().min(1).max(500)).min(1, 'Add a photo of the front of the building.').max(5),
+      ...geoFields,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('check_out'),
+      note: z.string().trim().max(2000).optional(),
+      // And again on the way out.
+      photoPaths: z.array(z.string().min(1).max(500)).min(1, 'Add a photo of the front of the building.').max(5),
       ...geoFields,
     })
     .strict(),
@@ -96,6 +106,8 @@ export type SiteEventInput = z.infer<typeof SiteEventSchema>
 // only makes sense before they've started working.
 const ON_SITE_STATUSES = ['accepted', 'assigned', 'in_progress'] as const
 const LATE_STATUSES = ['accepted', 'assigned'] as const
+// Check-out is once the work has started.
+const CHECK_OUT_STATUSES = ['in_progress'] as const
 
 export async function handleSiteEvent(opts: {
   req: Request
@@ -117,22 +129,24 @@ export async function handleSiteEvent(opts: {
           clientId: jobs.clientId,
           clerkId: jobs.clerkId,
           cleanerId: jobs.cleanerId,
+          listdApprovedAt: jobs.listdApprovedAt,
         })
         .from(jobs)
         .where(eq(jobs.id, jobId))
         .limit(1)
       if (!job) return { status: 'not_found' as const }
+      if (!job.listdApprovedAt) return { status: 'awaiting' as const }
 
       const assignedId = role === 'clerk' ? job.clerkId : job.cleanerId
       if (assignedId !== userId) return { status: 'forbidden' as const }
 
       const allowed: readonly string[] =
-        body.kind === 'running_late' ? LATE_STATUSES : ON_SITE_STATUSES
+        body.kind === 'running_late' ? LATE_STATUSES : body.kind === 'check_out' ? CHECK_OUT_STATUSES : ON_SITE_STATUSES
       if (!allowed.includes(job.status)) {
         return { status: 'wrong_state' as const, current: job.status }
       }
 
-      if (body.kind === 'arrival') {
+      if (body.kind === 'arrival' || body.kind === 'check_out') {
         const [existing] = await tx
           .select({ id: jobSiteEvents.id })
           .from(jobSiteEvents)
@@ -140,7 +154,7 @@ export async function handleSiteEvent(opts: {
             and(
               eq(jobSiteEvents.jobId, jobId),
               eq(jobSiteEvents.actorUserId, userId),
-              eq(jobSiteEvents.kind, 'arrival')
+              eq(jobSiteEvents.kind, body.kind)
             )
           )
           .limit(1)
@@ -180,7 +194,9 @@ export async function handleSiteEvent(opts: {
       const auditAction =
         body.kind === 'arrival'
           ? 'job.checked_in'
-          : body.kind === 'running_late'
+          : body.kind === 'check_out'
+            ? 'job.checked_out'
+            : body.kind === 'running_late'
             ? 'job.running_late'
             : 'job.no_access_reported'
       await logAuditEvent(tx, {
@@ -213,7 +229,12 @@ export async function handleSiteEvent(opts: {
                 title: `Your ${proNoun} has arrived`,
                 message: `Your ${proNoun} checked in at the property for job ${refSlug}.`,
               }
-            : body.kind === 'running_late'
+            : body.kind === 'check_out'
+              ? {
+                  title: `Your ${proNoun} has left the property`,
+                  message: `Your ${proNoun} checked out of job ${refSlug}. LISTD reviews the work before it comes to you.`,
+                }
+              : body.kind === 'running_late'
               ? {
                   title: `Your ${proNoun} is running late`,
                   message: `Your ${proNoun} expects to arrive in about ${body.etaMinutes} minutes for job ${refSlug}.`,
@@ -265,11 +286,14 @@ export async function handleSiteEvent(opts: {
       return conflict(`Cannot record this from status ${result.current}.`)
     }
     if (result.status === 'already') {
-      return conflict('Already checked in for this job.')
+      return conflict(body.kind === 'check_out' ? 'Already checked out of this job.' : 'Already checked in for this job.')
+    }
+    if (result.status === 'awaiting') {
+      return conflict('LISTD hasn’t approved this booking yet.')
     }
 
     // SMS after commit — a slow Twilio call must never hold a DB connection.
-    if (result.clientId && body.kind !== 'arrival') {
+    if (result.clientId && (body.kind === 'running_late' || body.kind === 'no_access')) {
       const smsBody =
         body.kind === 'running_late'
           ? `LISTD: your pro is running ~${body.etaMinutes} min late for job ${result.refSlug}. Sorry for the delay.`

@@ -10,6 +10,8 @@ const Body = z.object({
   jobId: z.string().uuid(),
   description: z.string().trim().min(3).max(2000),
   estimateP: z.number().int().min(0).optional(),
+  // Photos or videos of the extra work, in job-photos under the job.
+  evidencePaths: z.array(z.string().min(1).max(500)).min(1, 'Add a photo or video of the extra work.').max(10),
 }).strict()
 
 /** POST /api/pro/change-orders: propose extra work on an active job. */

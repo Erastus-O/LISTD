@@ -6,7 +6,6 @@ import { conflict, errorResponse, notFound, ok } from '@/lib/api'
 import { authorizeRequest } from '@/lib/dal'
 import {
   jobs,
-  notifications,
   profiles,
   properties,
   withServiceRole,
@@ -14,6 +13,7 @@ import {
 import { callerIp, callerUserAgent, logAuditEvent } from '@/lib/audit'
 import { isStripeConfigured } from '@/lib/billing/stripe'
 import { ukWallTimeToUtcIso } from '@/lib/scheduling/exact-time'
+import { afterProAccept, runApprovalEffects } from '@/lib/listd/job-approval'
 
 export const maxDuration = 15
 export const runtime = 'nodejs'
@@ -140,25 +140,6 @@ export async function POST(req: Request, { params }: { params: Params }) {
           .set({ scheduledAt: scheduledAtIso })
           .where(eq(jobs.id, jobId))
       }
-      const arrivalPhrase = scheduledAtIso
-        ? ` Arrival confirmed for ${body.arrivalTime}.`
-        : ''
-
-      const [prop] = job.propertyId
-        ? await tx
-            .select({
-              addressLine1: properties.addressLine1,
-              postcode: properties.postcode,
-            })
-            .from(properties)
-            .where(eq(properties.id, job.propertyId))
-            .limit(1)
-        : [null]
-      const addr = prop?.addressLine1
-        ? `${prop.addressLine1}${prop.postcode ? ', ' + prop.postcode : ''}`
-        : 'a property'
-      const refSlug = jobId.slice(0, 8)
-
       await logAuditEvent(tx, {
         category: 'job_lifecycle',
         action: 'job.accepted',
@@ -176,24 +157,10 @@ export async function POST(req: Request, { params }: { params: Params }) {
         userAgent: ua,
       })
 
-      await tx.insert(notifications).values([
-        {
-          userId: job.clientId,
-          type: 'job',
-          title: 'Cleaner assigned',
-          message: `Your clean ${refSlug} at ${addr} has been accepted by a verified cleaner.${arrivalPhrase}`,
-          link: `/client/jobs/${jobId}`,
-        },
-        {
-          userId: session.userId,
-          type: 'job',
-          title: 'Clean accepted',
-          message: `You've been assigned to ${refSlug} at ${addr}.`,
-          link: `/cleaner/jobs/${jobId}`,
-        },
-      ])
+      // LISTD approves before the address, codes and contacts unlock.
+      const approval = await afterProAccept(tx, { jobId, proId: session.userId, inspectionType: job.inspectionType })
 
-      return { status: 'ok' as const, jobId }
+      return { status: 'ok' as const, jobId, approval }
     })
 
     if (result.status === 'not_verified') {
@@ -209,7 +176,8 @@ export async function POST(req: Request, { params }: { params: Params }) {
     if (result.status === 'conflict') {
       return conflict('Job already claimed by another cleaner')
     }
-    return ok({ success: true, jobId: result.jobId })
+    if (result.approval.effects) await runApprovalEffects(result.approval.effects, session.userId)
+    return ok({ success: true, jobId: result.jobId, awaitingApproval: !result.approval.approved })
   } catch (err) {
     console.error('[cleaner/jobs/accept] error:', err)
     return errorResponse(err)

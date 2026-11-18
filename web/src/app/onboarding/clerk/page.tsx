@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { requireSession } from '@/lib/dal'
+import { proServicesOf } from '@/lib/listd/pro-services'
 import { getBookableServices } from '@/lib/pricing-matrix'
 import { getEffectivePricing } from '@/lib/pricing-settings'
 import { ClerkOnboarding } from './clerk-onboarding'
@@ -22,8 +23,7 @@ export default async function ClerkOnboardingPage() {
 
   // Non-clerks land back at the generic onboarding shell.
   if (
-    !session.roles.includes('clerk') &&
-    !session.roles.includes('admin') &&
+    !['clerk', 'cleaner', 'trades', 'admin'].some((r) => session.roles.includes(r as never)) &&
     session.roles.length > 0
   ) {
     redirect('/onboarding')
@@ -36,7 +36,7 @@ export default async function ClerkOnboardingPage() {
   // dashboard left no way to re-upload before suspension.
   const status = session.profile?.verificationStatus ?? 'unverified'
   if (status === 'pending_verification') {
-    redirect('/clerk/dashboard')
+    redirect('/post-signin')
   }
 
   // Service list is driven by the live rate card — built-ins plus any
@@ -64,6 +64,7 @@ export default async function ClerkOnboardingPage() {
         languages: session.profile?.languages ?? [],
       }}
       rejectionReason={session.profile?.verificationRejectionReason ?? null}
+      initialCategories={proServicesOf(session.roles)}
       serviceOptions={serviceOptions}
     />
   )

@@ -1,3 +1,5 @@
+import { ProWorkflowForm } from './pro-workflow-form'
+import { getProWorkflow } from '@/lib/listd/pro-workflow'
 import Link from 'next/link'
 import { inArray } from 'drizzle-orm'
 import { Percent, Plug } from 'lucide-react'
@@ -43,6 +45,7 @@ export default async function AdminSettingsPage() {
   )
 
   const map = new Map(rows.map((r) => [r.key, r.value ?? '']))
+  const workflow = await getProWorkflow()
 
   const initial = {
     trustpilot_enabled: map.get('trustpilot_enabled') === 'true',
@@ -108,6 +111,7 @@ export default async function AdminSettingsPage() {
           />
         </CardContent>
       </Card>
+      <ProWorkflowForm initial={workflow} />
       <AdminSettingsForm initial={initial} />
 
       {/* Legal & privacy consent */}

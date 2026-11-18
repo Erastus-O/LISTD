@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
+import { approveInTx, runApprovalEffects } from '@/lib/listd/job-approval'
 import { errorResponse, notFound, ok } from '@/lib/api'
 import { authorizeRequest } from '@/lib/dal'
 import { jobs, notifications, profiles, withServiceRole } from '@/db'
@@ -69,6 +70,8 @@ export async function POST(req: Request, { params }: { params: Params }) {
           status: 'assigned',
           assignedBy: session.userId,
           assignedByName: adminProfile?.fullName ?? null,
+          // Re-approved below for the new Pro, which sends them the brief.
+          listdApprovedAt: null,
         })
         .where(eq(jobs.id, jobId))
 
@@ -96,10 +99,13 @@ export async function POST(req: Request, { params }: { params: Params }) {
         link: `/clerk/jobs/${jobId}`,
       })
 
-      return { status: 'ok' as const }
+      // An admin assignment is LISTD's approval.
+      const effects = await approveInTx(tx, { jobId, actorId: session.userId, mode: 'manual' })
+      return { status: 'ok' as const, effects }
     })
 
     if (result.status === 'not_found') return notFound('Job not found')
+    if (result.effects) await runApprovalEffects(result.effects, session.userId)
     return ok({ success: true })
   } catch (err) {
     console.error('[admin/jobs/assign-clerk] error:', err)

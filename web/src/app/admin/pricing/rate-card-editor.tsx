@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { SIZE_LABEL, type Pricing, type ProRole } from '@/lib/listd/pricing'
+import { SIZE_LABEL, type Pricing } from '@/lib/listd/pricing'
 
 const RATE_ROWS: Array<[keyof Pricing['rates'], string]> = [
   ['INVENTORY', 'Inventory & Condition'],
@@ -12,11 +12,6 @@ const RATE_ROWS: Array<[keyof Pricing['rates'], string]> = [
   ['COMBO', 'Inventory + check-in, same visit'],
   ['MID_TERM', 'Mid-term'],
   ['CHECK_OUT', 'Check-out'],
-]
-const ROLE_ROWS: Array<[ProRole, string]> = [
-  ['CLERK', 'Pro Clerk'],
-  ['CLEANER', 'Pro Cleaner'],
-  ['TRADES', 'Pro Trades'],
 ]
 
 const toP = (v: string) => Math.round((Number(v) || 0) * 100)
@@ -49,7 +44,7 @@ export function RateCardEditor({ initial }: { initial: Pricing }) {
           outbuildingP: pr.outbuildingP,
           outdoorP: pr.outdoorP,
           sched: pr.sched,
-          pro: pr.pro,
+          fees: pr.fees,
           repairs: pr.repairs,
           rebate: pr.rebate,
           taxPct: pr.taxPct,
@@ -120,7 +115,6 @@ export function RateCardEditor({ initial }: { initial: Pricing }) {
             <Money id="x-out" label="Outbuildings" value={pr.outbuildingP} onChange={(outbuildingP) => set({ outbuildingP })} />
             <Money id="x-door" label="Large outdoor area" value={pr.outdoorP} onChange={(outdoorP) => set({ outdoorP })} />
             <Money id="s-pri" label="Priority (client)" value={pr.sched.priorityP} onChange={(priorityP) => set({ sched: { ...pr.sched, priorityP } })} />
-            <Money id="s-pro" label="Priority (to the Pro)" value={pr.sched.priorityProP} onChange={(priorityProP) => set({ sched: { ...pr.sched, priorityProP } })} />
             <Money id="r-diag" label="Repair diagnosis" value={pr.repairs.diagnosisP} onChange={(diagnosisP) => set({ repairs: { ...pr.repairs, diagnosisP } })} />
           </div>
           <label className="flex items-center gap-3 text-sm">
@@ -129,26 +123,25 @@ export function RateCardEditor({ initial }: { initial: Pricing }) {
           </label>
         </section>
 
-        <section className="a-card grid gap-3">
-          <h2 className="text-base font-semibold">Pro hourly rates (£)</h2>
-          {ROLE_ROWS.map(([role, label]) => (
-            <div key={role} className="grid gap-3 sm:grid-cols-4">
-              <p className="self-center text-sm font-medium">{label}</p>
-              {pr.pro.rates[role].map((p, i) => (
-                <Money
-                  key={i}
-                  id={`rate-${role}-${i}`}
-                  label={`Level ${i + 1}`}
-                  value={p}
-                  onChange={(v) => {
-                    const next = [...pr.pro.rates[role]]
-                    next[i] = v
-                    set({ pro: { ...pr.pro, rates: { ...pr.pro.rates, [role]: next } } })
-                  }}
-                />
-              ))}
-            </div>
-          ))}
+        <section className="a-card grid gap-3 sm:grid-cols-3">
+          <div className="sm:col-span-3">
+            <h2 className="text-base font-semibold">LISTD fees</h2>
+            <p className="a-muted mt-1 text-sm">
+              Pros earn the job price less the commission and only ever see that figure. Clients pay the job price plus the booking fee, shown as its own line. Requotes recalculate both on the new total.
+            </p>
+          </div>
+          <div>
+            <Label htmlFor="fee-pro">Commission from the Pro (%)</Label>
+            <Input id="fee-pro" className="mt-1.5" inputMode="decimal" defaultValue={pr.fees.proPct} onBlur={(e) => set({ fees: { ...pr.fees, proPct: Math.min(100, Math.max(0, Number(e.target.value) || 0)) } })} />
+          </div>
+          <div>
+            <Label htmlFor="fee-client">Booking fee to the client (%)</Label>
+            <Input id="fee-client" className="mt-1.5" inputMode="decimal" defaultValue={pr.fees.clientPct} onBlur={(e) => set({ fees: { ...pr.fees, clientPct: Math.max(0, Number(e.target.value) || 0) } })} />
+          </div>
+          <Money id="fee-min" label="Minimum booking fee (£)" value={pr.fees.clientMinP} onChange={(clientMinP) => set({ fees: { ...pr.fees, clientMinP } })} />
+          <p className="a-fine sm:col-span-3">
+            Example: a £150 job. The Pro earns £{((15000 * (100 - pr.fees.proPct)) / 100 / 100).toFixed(2)}, the client pays £{((15000 + Math.max(pr.fees.clientMinP, Math.round((15000 * pr.fees.clientPct) / 100))) / 100).toFixed(2)}.
+          </p>
         </section>
 
         <section className="a-card grid gap-3 sm:grid-cols-3">
